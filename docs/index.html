@@ -1,0 +1,115 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Celsus OS</title>
+<meta name="description" content="A knowledge base OS for your Obsidian vault. Understand what you have, make the connections you missed, improve it one decision at a time, and add the context that is missing.">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Newsreader:opsz,wght@6..72,400;6..72,500&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+:root{--bg:#10151a;--surface:#1a2127;--surface-2:#212a32;--line:#2c3640;--line-strong:#3e4a56;--text:#e9e5da;--dim:#aab1b7;--muted:#717a83;--brass:#d9a441;--brass-ink:#1d1a12;--brass-soft:rgba(217,164,65,.14);--person:#a99af0;--company:#5ec8b6;--effort:#e2a54a;--product:#6fa9ee;color-scheme:dark}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--text);font:16px/1.6 "IBM Plex Sans",system-ui,sans-serif}
+.wrap{max-width:1080px;margin:0 auto;padding-inline:20px;padding-block:28px 60px}
+header.top{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}
+.brand{font-family:"Newsreader",Georgia,serif;font-size:22px;font-weight:500}
+nav a{color:var(--dim);text-decoration:none;font-size:14px;margin-left:18px}nav a:hover{color:var(--text)}
+.hero{display:grid;gap:18px;margin-top:36px}
+.hero img{width:100%;height:auto;border-radius:14px;border:1px solid var(--line);display:block}
+h1{font-family:"Newsreader",Georgia,serif;font-weight:500;font-size:clamp(34px,5vw,54px);line-height:1.08;margin:0;text-wrap:balance;max-width:20ch}
+.lede{font-size:19px;color:var(--dim);max-width:60ch;margin:0}
+.cmd{display:flex;align-items:center;gap:10px;flex-wrap:wrap;background:var(--surface);border:1px solid var(--line-strong);border-radius:10px;padding:12px 14px;max-width:820px}
+.cmd code{font-family:"IBM Plex Mono",ui-monospace,monospace;font-size:13.5px;color:var(--text);flex:1;min-width:0;overflow-x:auto;white-space:nowrap}
+.cmd button{font:inherit;font-size:12px;font-weight:600;background:var(--brass);color:var(--brass-ink);border:0;border-radius:6px;padding:7px 12px;cursor:pointer}
+.cmd button:focus-visible{outline:2px solid var(--text);outline-offset:2px}
+.req{font-size:13px;color:var(--muted);margin:0}
+.eyebrow{font-size:11px;letter-spacing:.09em;text-transform:uppercase;color:var(--muted);font-weight:600}
+section{margin-top:64px}
+h2{font-family:"Newsreader",Georgia,serif;font-weight:500;font-size:32px;margin:6px 0 18px;text-wrap:balance}
+.verbs{display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:14px}
+.verb{border:1px solid var(--line);border-radius:12px;padding:18px 18px 16px;background:var(--surface);display:grid;gap:8px;align-content:start}
+.verb h3{margin:0;font-family:"Newsreader",Georgia,serif;font-weight:500;font-size:24px}
+.verb p{margin:0;color:var(--dim);font-size:14.5px}
+.verb .where{font-family:"IBM Plex Mono",monospace;font-size:11px;color:var(--brass)}
+.verb i{display:block;width:34px;height:34px;border-radius:50%;border:3px solid var(--line-strong);position:relative}
+.verb i::after{content:"";position:absolute;inset:-3px;border-radius:50%;border:3px solid transparent;border-top-color:var(--k);border-right-color:var(--k)}
+.two{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:28px}
+.two p{color:var(--dim);margin:8px 0;max-width:58ch}
+ol.steps{margin:0;padding-left:0;list-style:none;display:grid;gap:10px;counter-reset:s}
+ol.steps li{position:relative;padding-left:44px;color:var(--dim)}
+ol.steps li b{color:var(--text);font-family:"IBM Plex Mono",monospace;font-weight:500}
+ol.steps li::before{counter-increment:s;content:counter(s);position:absolute;left:0;top:2px;width:28px;height:28px;border-radius:50%;background:var(--brass-soft);color:var(--brass);border:1px solid var(--brass);text-align:center;font:600 13px/28px "IBM Plex Mono",monospace}
+.strip{border-top:1px solid var(--line);border-bottom:1px solid var(--line);padding:22px 0;display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:18px}
+.strip div b{display:block;font-family:"Newsreader",Georgia,serif;font-size:26px;font-weight:500}
+.strip div span{color:var(--muted);font-size:13.5px}
+footer{margin-top:64px;color:var(--muted);font-size:13.5px;display:flex;gap:18px;flex-wrap:wrap;align-items:center}
+footer a{color:var(--dim)}
+a.btn{display:inline-block;background:var(--brass);color:var(--brass-ink);text-decoration:none;font-weight:600;font-size:14px;padding:10px 16px;border-radius:8px}
+a.btn.ghost{background:transparent;color:var(--text);border:1px solid var(--line-strong)}
+.ctas{display:flex;gap:10px;flex-wrap:wrap}
+@media (prefers-reduced-motion:reduce){*{transition:none!important}}
+</style>
+</head>
+<body>
+<div class="wrap">
+<header class="top"><span class="brand">Celsus OS</span><nav><a href="#install">Install</a><a href="#loop">The loop</a><a href="#learn">How it learns</a><a href="https://github.com/Champ-Deep/celsus-os">GitHub</a></nav></header>
+
+<div class="hero">
+  <span class="eyebrow">A knowledge base OS for your Obsidian vault</span>
+  <h1>Understand it. Connect it. Improve it. Fill in what is missing.</h1>
+  <p class="lede">Celsus reads your vault, maps it as a living graph, and turns the mess (drifting names, duplicate notes, links you never drew, people with no note) into short questions you answer with one key. It learns how you decide, so it asks less over time. A pixel owl does the asking, and answers yours in small interface blocks instead of paragraphs.</p>
+  <div class="ctas"><a class="btn" href="#install">Install in one line</a><a class="btn ghost" href="https://github.com/Champ-Deep/celsus-os/blob/main/TESTING.md">Read the walk through</a></div>
+  <img src="hero.svg" alt="The Celsus graph: tinted nodes sized by links, a halo on a node with a pending decision, and the owl asking whether Epicor APAC is the same as Epicor">
+</div>
+
+<section id="install">
+  <span class="eyebrow">Install</span>
+  <h2>One line, then four commands</h2>
+  <div class="cmd"><code id="cmd">curl -fsSL https://raw.githubusercontent.com/Champ-Deep/celsus-os/main/install.sh | sh</code><button id="copy" type="button">Copy</button></div>
+  <p class="req">macOS or Linux, git, Node 22.18 or newer, and an OpenRouter key. Zero dependencies; nothing is installed beyond the app folder in ~/.celsus-os.</p>
+  <div class="two" style="margin-top:18px">
+    <ol class="steps">
+      <li><b>celsus setup</b> pastes your key, points at your vault, picks a model. The default narrator is free.</li>
+      <li><b>celsus doctor</b> checks the machine end to end.</li>
+      <li><b>celsus run</b> is the first pass: about four minutes for 3,000 notes, two cents of Jev.</li>
+      <li><b>celsus serve</b> opens the app at localhost:3043.</li>
+    </ol>
+    <div><p>Only names and titles leave your machine, for the classifier. Note bodies never do. Your key lives outside the vault. Every run writes into a dated folder inside the vault, and the app itself only writes three things there: notes you save, the policy note, and archive moves. Nothing is ever deleted from disk.</p></div>
+  </div>
+</section>
+
+<section id="loop">
+  <span class="eyebrow">The loop</span>
+  <h2>Four verbs, four screens</h2>
+  <div class="verbs">
+    <div class="verb" style="--k:var(--company)"><i></i><h3>Understand</h3><p>The vault becomes a graph. Size is how linked a note is, the ring is how complete it is, the icon is what kind of thing it is, and a halo means a decision is waiting. Click a node and the owl tells you what it is connected to and what is pending. Ask anything.</p><span class="where">Graph</span></div>
+    <div class="verb" style="--k:var(--product)"><i></i><h3>Connect</h3><p>Every mention resolves to one canonical note (misspellings, initials, aliases), with Jev judging the ambiguous ones. Pairs of notes that never link but should are surfaced, and efforts get their owner suggested.</p><span class="where">Graph · Decide</span></div>
+    <div class="verb" style="--k:var(--effort)"><i></i><h3>Improve</h3><p>Every open question is a flashcard: one at a time, keys 1 to 4, the recommended answer filled when Jev is confident, one line on why you are seeing it. Duplicates archive with one click and restore with one more.</p><span class="where">Decide · Duplicates</span></div>
+    <div class="verb" style="--k:var(--person)"><i></i><h3>Add context</h3><p>Things linked from everywhere with no note, ranked by links. Two lines from you, then Laya drafts the note from your template and links what it recognises, Jev checks it is complete, you fill the gaps and save.</p><span class="where">Missing notes</span></div>
+  </div>
+</section>
+
+<section id="learn">
+  <span class="eyebrow">How it learns</span>
+  <h2>It rewrites its own policy after every answer</h2>
+  <div class="two">
+    <div><p>Each answer updates a rule store keyed by the shape of the question. Five consistent answers at 0.90 confidence and the rule decides on its own, with undo. The store is rewritten as a readable note in your vault, Decision Policy.md, and its standing rules are briefed to the classifier before it decides anything, so it is told how you decide first.</p></div>
+    <div><p>The same store trains Laya, the local writing model: a system prompt, a chat format training set, and an Ollama Modelfile, regenerated after every answer. One command refreshes the local model, and the narrator then runs entirely on your machine.</p></div>
+  </div>
+  <div class="strip" style="margin-top:26px">
+    <div><b>2 cents</b><span>for a whole vault pass through Jev</span></div>
+    <div><b>0 deps</b><span>one Node process, no build step</span></div>
+    <div><b>names only</b><span>leave the machine for classification</span></div>
+    <div><b>1 key</b><span>answers a card; rules answer the rest</span></div>
+  </div>
+</section>
+
+<footer><span>MIT licensed.</span><a href="https://github.com/Champ-Deep/celsus-os">Source</a><a href="https://github.com/Champ-Deep/celsus-os/blob/main/TESTING.md">Testing guide</a><a href="https://github.com/Champ-Deep/celsus-os/blob/main/CONTRIBUTING.md">Contributing</a><span>Built by Champions Accelerator for people whose vaults grew faster than their memory.</span></footer>
+</div>
+<script>
+document.getElementById('copy').addEventListener('click', function(){ var t=document.getElementById('cmd').textContent, b=this; function done(ok){ b.textContent = ok ? 'Copied' : 'Select and copy'; setTimeout(function(){ b.textContent='Copy'; }, 1600); }
+  if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(t).then(function(){done(true)}, function(){ var r=document.createRange(); r.selectNodeContents(document.getElementById('cmd')); var s=getSelection(); s.removeAllRanges(); s.addRange(r); done(false); });
+  else { var r=document.createRange(); r.selectNodeContents(document.getElementById('cmd')); var s=getSelection(); s.removeAllRanges(); s.addRange(r); done(false); } });
+</script>
+</body>
+</html>

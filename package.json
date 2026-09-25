@@ -1,0 +1,46 @@
+{
+  "name": "celsus-os",
+  "type": "module",
+  "description": "Celsus OS: a knowledge base OS over an Obsidian vault. Map it as a graph, answer short decisions, let it learn how you decide, and let a pixel mascot answer questions in interface blocks.",
+  "version": "0.1.0",
+  "bin": {
+    "celsus": "./bin/celsus",
+    "celsus-os": "./cli.ts"
+  },
+  "engines": {
+    "node": ">=22.18"
+  },
+  "scripts": {
+    "setup": "node cli.ts setup",
+    "doctor": "node cli.ts doctor",
+    "run": "node cli.ts run",
+    "serve": "node cli.ts serve",
+    "restart": "node cli.ts restart"
+  },
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/Champ-Deep/celsus-os.git"
+  },
+  "homepage": "https://github.com/Champ-Deep/celsus-os",
+  "keywords": [
+    "obsidian",
+    "knowledge-graph",
+    "second-brain",
+    "jev",
+    "typesafe",
+    "openrouter",
+    "generative-ui"
+  ],
+  "files": [
+    "*.ts",
+    "bin",
+    "ui",
+    "docs",
+    "README.md",
+    "TESTING.md",
+    "CONTRIBUTING.md",
+    "LICENSE",
+    "install.sh"
+  ]
+}

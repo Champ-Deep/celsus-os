@@ -1,0 +1,7 @@
+node_modules/
+.DS_Store
+*.log
+*.pid
+.celsus-os/
+ui/pets/
+ui/mascot.json

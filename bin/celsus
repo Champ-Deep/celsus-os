@@ -1,0 +1,9 @@
+#!/bin/sh
+# `celsus` launcher. Resolves its own symlink, then runs cli.ts with Node (22.18 or newer runs TypeScript directly).
+SELF="$0"
+while [ -L "$SELF" ]; do
+  LINK=$(readlink "$SELF")
+  case "$LINK" in /*) SELF="$LINK";; *) SELF="$(dirname "$SELF")/$LINK";; esac
+done
+APP="$(cd "$(dirname "$SELF")/.." && pwd)"
+exec node "$APP/cli.ts" "$@"
