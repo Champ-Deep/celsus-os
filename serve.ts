@@ -53,6 +53,12 @@ function load() {
 function ruleUpdate(pattern: string, choice: string, delta: number) {
   const r = rules[pattern] || (rules[pattern] = { answers: {}, support: 0 });
   r.answers[choice] = Math.max(0, (r.answers[choice] || 0) + delta); r.support = Math.max(0, r.support + delta);
+  // An undone answer has to leave no trace. Clamping the counter to 0 is not enough: the key
+  // survives, so a choice nobody ever made stays in the answers map, can win the best sort, gets
+  // written into the Decision Policy note as "(something) 0", and is briefed to Jev and into
+  // Laya's training set. Drop empty answers, and drop the whole rule once nothing is left.
+  for (const k of Object.keys(r.answers)) if (!r.answers[k]) delete r.answers[k];
+  if (!r.support || !Object.keys(r.answers).length) { delete rules[pattern]; fs.mkdirSync(RUNS, { recursive: true }); return fs.writeFileSync(RULES, JSON.stringify(rules, null, 1)); }
   const best = Object.entries(r.answers).sort((a: any, b: any) => b[1] - a[1])[0] as [string, number] | undefined;
   r.best = best?.[0]; r.confidence = best ? +(((best[1] as number) + 1) / (r.support + 2)).toFixed(3) : 0;
   r.auto = r.confidence >= AUTO.confidence && r.support >= AUTO.support;
@@ -74,7 +80,12 @@ const title = (id?: string) => (id && g.byId.get(id)?.title) || id?.split('/').p
 const kind = (id?: string) => (id && g.byId.get(id)?.kind) || 'note';
 const kind_ = kind;
 
-function buildCards() {
+// Deck order. 'unsure' surfaces the questions Celsus is least sure about first, which is the
+// queue worth a human: those are the ones only Deep can settle. 'impact' is the old blast-radius
+// order (shared neighbours, links moved) and is kept because the graph halo is computed from it.
+function needScore(c: any) { return (1 - Math.min(Math.max(c.p ?? 1, 0), 1)) * 1000 + (c.impact || 0); }
+
+function buildCards(sort: 'unsure' | 'impact' = 'unsure') {
   const done = labelled(); const cards: any[] = [];
   for (const d of decisions) {
     if (!(d.verdict === 'merge' || (d.verdict === 'review' && d.count >= 2) || (d.verdict === 'new_entity' && d.count >= 5))) continue;
@@ -120,9 +131,10 @@ function buildCards() {
     if (r?.auto && c.options.some((o: any) => o.key === r.best)) { const l = { id: c.id, choice: r.best, pattern: c.pattern, source: 'rule', at: new Date().toISOString(), q: c.q }; labels.push(l); fs.appendFileSync(LABELS, JSON.stringify(l) + '\n'); decided.push(l); continue; }
     deck.push(c);
   }
-  deck.sort((a, b) => b.impact - a.impact);
+  if (sort === 'impact') deck.sort((a, b) => b.impact - a.impact);
+  else deck.sort((a, b) => needScore(b) - needScore(a));
   if (decided.length) writePolicy();
-  return { deck, decided, total: cards.length };
+  return { deck, decided, total: cards.length, sort };
 }
 
 // ---------- graph ----------
@@ -248,9 +260,10 @@ const server = http.createServer(async (req, res) => {
     if (p === '/favicon.ico') { res.writeHead(204); return res.end(); }
     if (p.startsWith('/ui/')) { const f = path.join(HERE, 'ui', path.normalize(p.slice(4)).replace(/^(\.\.[\/\\])+/, '')); const ext = path.extname(f).toLowerCase(); const types: Record<string, string> = { '.js': 'text/javascript', '.json': 'application/json', '.png': 'image/png', '.webp': 'image/webp', '.css': 'text/css' }; if (!types[ext] || !fs.existsSync(f)) return send(res, 404, { error: 'not found' }); res.writeHead(200, { 'Content-Type': types[ext], 'Cache-Control': 'no-store' }); return res.end(fs.readFileSync(f)); }
     if (p === '/api/state') {
-      const { deck, decided, total } = buildCards(); const human = labels.filter(l => l.source === 'human');
+      const sort = (url.searchParams.get('sort') === 'impact') ? 'impact' : 'unsure';
+      const { deck, decided, total } = buildCards(sort); const human = labels.filter(l => l.source === 'human');
       const topRules = Object.entries(rules).map(([pattern, r]: any) => ({ pattern, ...r })).sort((a, b) => b.support - a.support).slice(0, 12);
-      return send(res, 200, { llm: loadConfig()?.llm, llmBaseUrl: loadConfig()?.llmBaseUrl || '', configured: !!loadConfig()?.openrouterKey, run: path.basename(latestRunWith('resolutions.json') || ''), notes: notes.length, resolved: Object.keys(resolutions).length, ghosts: ghosts.length, deck: deck.slice(0, 60), deckSize: deck.length, totalCards: total, decidedForYou: labels.filter(l => l.source === 'rule').slice(-10).reverse(), answered: human.length, rules: topRules, cardsPer100: (decisions.length + links.length + owners.length + dups.length) ? +((deck.length / (decisions.length + links.length + owners.length + dups.length)) * 100).toFixed(1) : 0, dupCounts: dups.reduce((m: any, r: any) => (m[r.verdict] = (m[r.verdict] || 0) + 1, m), {}), laya: layaInfo() });
+      return send(res, 200, { llm: loadConfig()?.llm, llmBaseUrl: loadConfig()?.llmBaseUrl || '', configured: !!loadConfig()?.openrouterKey, run: path.basename(latestRunWith('resolutions.json') || ''), notes: notes.length, resolved: Object.keys(resolutions).length, ghosts: ghosts.length, sort, deck: deck.slice(0, 60), deckSize: deck.length, totalCards: total, decidedForYou: labels.filter(l => l.source === 'rule').slice(-10).reverse(), answered: human.length, rules: topRules, unsure: deck.slice(0, 60).filter((c: any) => (c.p ?? 1) < 0.7).length, cardsPer100: (decisions.length + links.length + owners.length + dups.length) ? +((deck.length / (decisions.length + links.length + owners.length + dups.length)) * 100).toFixed(1) : 0, dupCounts: dups.reduce((m: any, r: any) => { m[r.verdict] = (m[r.verdict] || 0) + 1; return m; }, {}), laya: layaInfo() });
     }
     if (p === '/api/answer' && req.method === 'POST') { const b = await readBody(req); const prior = labelled().get(b.id); if (prior) return send(res, 409, { error: 'already answered', label: prior }); const card = buildCards().deck.find((c: any) => c.id === b.id); if (!card) return send(res, 404, { error: 'card not in deck' }); const l = { id: b.id, choice: b.choice, pattern: card.pattern, source: 'human', at: new Date().toISOString(), q: card.q }; labels.push(l); fs.mkdirSync(RUNS, { recursive: true }); fs.appendFileSync(LABELS, JSON.stringify(l) + '\n'); if (b.choice !== 'skip') ruleUpdate(card.pattern, b.choice, 1); writePolicy(); return send(res, 200, { ok: true, rule: rules[card.pattern] }); }
     if (p === '/api/undo' && req.method === 'POST') { const b = await readBody(req); const i = labels.map(l => l.id).lastIndexOf(b.id); if (i < 0) return send(res, 404, { error: 'no label' }); const [l] = labels.splice(i, 1); fs.writeFileSync(LABELS, labels.map(x => JSON.stringify(x)).join('\n') + (labels.length ? '\n' : '')); if (l.choice !== 'skip') ruleUpdate(l.pattern, l.choice, -1); if (l.source === 'rule') ruleUpdate(l.pattern, l.choice, -1); writePolicy(); return send(res, 200, { ok: true }); }
@@ -272,6 +285,68 @@ const server = http.createServer(async (req, res) => {
     if (p === '/api/rule-note' && req.method === 'POST') { const b = await readBody(req); if (!b.pattern || !b.text) return send(res, 400, { error: 'pattern and text required' }); const r = rules[b.pattern] || (rules[b.pattern] = { answers: {}, support: 0 }); (r.notes ||= []).push({ text: String(b.text).slice(0, 500), at: new Date().toISOString() }); fs.mkdirSync(RUNS, { recursive: true }); fs.writeFileSync(RULES, JSON.stringify(rules, null, 1)); writePolicy(); return send(res, 200, { ok: true, notes: r.notes.length }); }
     if (p === '/api/narrate' && req.method === 'POST') { const b = await readBody(req); const entity = String(b.entity || ''); const isVault = !entity || normalizeKey(entity) === VAULT_KEY; const rec = await ask(isVault ? 'Give an overview of this vault: the biggest companies, people and efforts, what is pending, what is missing, and the single most useful thing to do next.' : `Describe ${entity}: who and what it is connected to, what is pending on it, and the single most useful thing to do next.`, isVault ? VAULT_KEY : entity); if (rec.view) { fs.mkdirSync(path.join(RUNS, 'narrations'), { recursive: true }); fs.writeFileSync(path.join(RUNS, 'narrations', (isVault ? 'Whole vault' : entity).replace(/[\/\\]/g, '-') + '.json'), JSON.stringify({ model: rec.model, latencyMs: rec.latencyMs, at: rec.at, view: rec.view }, null, 1)); } return send(res, 200, rec); }
     if (p === '/api/policy') return send(res, 200, fs.existsSync(POLICY) ? fs.readFileSync(POLICY, 'utf8') : '# No policy yet\n\nAnswer a card.', 'text/markdown');
+    if (p === '/api/health') {
+      // The dashboard answer to "what is strong and what is missing", measured rather than guessed.
+      // Everything here is derived from the vault and the latest run, so the numbers move when the
+      // vault moves and there is nothing to keep in sync by hand.
+      const inboundByFolder = new Map<string, { notes: number; inbound: number; outbound: number; words: number; nested: boolean }>();
+      const bump = (m: Map<string, { notes: number; inbound: number; outbound: number; words: number; nested: boolean }>, k: string) => { const v = m.get(k) || { notes: 0, inbound: 0, outbound: 0, words: 0, nested: false }; m.set(k, v); return v; };
+      let totalLinks = 0, resolvableLinks = 0, unlinkedNotes = 0, fresh = 0, words = 0;
+      const now = Date.now();
+      for (const n of notes) {
+        const f = bump(inboundByFolder, n.folder); f.notes++; f.words += n.words; words += n.words;
+        // n.folder is only the first path segment, so a file at the root and a file inside a folder
+        // share a key shape. A path with a slash is what tells them apart.
+        if (n.path.includes('/')) f.nested = true;
+        let outbound = 0;
+        for (const l of n.links) { totalLinks++; if (resolve(l.target)) { outbound++; resolvableLinks++; } }
+        if (outbound) f.outbound += outbound; else unlinkedNotes++;
+        if (inbound.get(n.path)) f.inbound += inbound.get(n.path)!;
+        if (now - n.mtimeMs < 30 * 864e5) fresh++;
+      }
+      const folders = [...inboundByFolder.entries()].map(([folder, v]) => ({
+        folder, notes: v.notes, words: v.words, inbound: v.inbound,
+        // A file at the root of the mapped folder has no parent folder, so its own name becomes the
+        // key. Flag it, or the dashboard ranks "Home.md" as the strongest folder in the vault.
+        root: !v.nested,
+        // Reachability: share of the folder's notes that something else in the vault points at. The
+        // number that changes behaviour, because an orphaned folder can average out to a healthy vault.
+        reach: v.notes ? +((v.inbound / v.notes)).toFixed(2) : 0,
+        density: v.notes ? +((v.outbound / v.notes)).toFixed(1) : 0,
+      })).sort((a, b) => b.notes - a.notes);
+      // A root file is not a folder. Rank the two lists over real folders only, and list the root
+      // files separately, because reachability per note is meaningless for a single file.
+      const realFolders = folders.filter(f => !f.root && f.notes >= 3);
+      const best = [...realFolders].sort((a, b) => b.reach - a.reach || b.density - a.density).slice(0, 5);
+      const worst = [...realFolders].sort((a, b) => a.reach - b.reach || a.density - b.density).slice(0, 5);
+      const rootFiles = folders.filter(f => f.root).sort((a, b) => b.inbound - a.inbound);
+      const kinds = new Map<string, number>();
+      for (const e of g.entities) kinds.set(e.kind, (kinds.get(e.kind) || 0) + 1);
+      const topHubs = [...inbound.entries()].sort((a, b) => b[1] - a[1]).slice(0, 10).map(([id, d]) => ({ id, title: title(id), inbound: d, kind: kind(id) }));
+      // buildCards decides rule-backed cards for you and writes those labels, so it is called once.
+      const deckAll = buildCards('unsure').deck;
+      const byPattern = new Map<string, number>();
+      for (const c of deckAll) byPattern.set(c.pattern, (byPattern.get(c.pattern) || 0) + 1);
+      return send(res, 200, {
+        run: path.basename(latestRunWith('resolutions.json') || ''),
+        notes: notes.length, words, unlinkedNotes, fresh30d: fresh,
+        links: totalLinks, resolvableLinks, linkRate: totalLinks ? +((resolvableLinks / totalLinks) * 100).toFixed(1) : 0,
+        entities: g.entities.length,
+        byKind: [...kinds.entries()].sort((a, b) => b[1] - a[1]).map(([kind, count]) => ({ kind, count })),
+        ghosts: ghosts.length,
+        topUnresolved: ghosts.slice(0, 12).map((x: any) => ({ name: x.name || x.key, count: x.count, type: x.type })),
+        folders, best, worst, rootFiles, topHubs,
+        deck: {
+          pending: deckAll.length,
+          unsure: deckAll.filter((c: any) => (c.p ?? 1) < 0.7).length,
+          byPattern: [...byPattern.entries()].sort((a, b) => b[1] - a[1]).slice(0, 10).map(([pattern, n]) => ({ pattern, n })),
+        },
+        answered: labels.filter(l => l.source === 'human').length,
+        rules: Object.keys(rules).length,
+        autoDecided: labels.filter(l => l.source === 'rule').length,
+        coverage: notes.length ? +(((notes.length - unlinkedNotes) / notes.length) * 100).toFixed(1) : 0,
+      });
+    }
     if (p === '/api/search') { const q = normalizeKey(url.searchParams.get('q') || ''); const hits = q ? g.entities.filter(e => normalizeKey(e.title).includes(q)).sort((a, b) => (inbound.get(b.id) || 0) - (inbound.get(a.id) || 0)).slice(0, 8).map(e => ({ id: e.id, title: e.title, kind: e.kind, inbound: inbound.get(e.id) || 0 })) : []; return send(res, 200, hits); }
     if (p === '/api/ghosts') return send(res, 200, ghosts.slice(0, 200));
     if (p === '/api/duplicates') return send(res, 200, dups);

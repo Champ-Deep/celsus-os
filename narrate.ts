@@ -3,14 +3,14 @@
 //   node narrate.ts "SPAN Global Services"
 import fs from 'node:fs';
 import path from 'node:path';
-import { readVault, normalizeKey, VAULT_ROOT, ensureDir, todayStamp, latestRunWith } from './vault.ts';
+import { readVault, normalizeKey, VAULT_ROOT, ensureDir, todayRunDir, RUNS, latestRunWith } from './vault.ts';
 import { buildGlossary } from './glossary.ts';
 import { chat, extractJson } from './llm.ts';
 import { requireConfig } from './config.ts';
 
 const name = process.argv[2];
 if (!name) { console.error('usage: node narrate.ts "<entity title>"'); process.exit(1); }
-const RUN = path.join(VAULT_ROOT, 'Efforts', 'Active', 'Celsus OS', 'runs', todayStamp());
+const RUN = todayRunDir();
 
 function loadJson(p: string, fallback: any) { try { return JSON.parse(fs.readFileSync(p, 'utf8')); } catch { return fallback; } }
 
@@ -36,7 +36,7 @@ async function main() {
   const system = 'You write the authored view for one entity in a personal knowledge graph called Celsus. You receive a dossier of names, kinds and counts (no note bodies). Write for the vault owner, plainly, no hype, no em dashes. Never invent facts beyond the dossier. Return JSON only: {"prose": "2 to 4 sentences with [[wikilinks]] to entities in the dossier", "stats": [{"label": "...", "value": "..."}] (max 4), "cards": [{"title": "...", "why": "..."}] (max 3, the most useful neighbours), "next_action": "one sentence: the single most useful thing to do about this entity now, e.g. fill a stub, confirm a suggested edge, create a missing note"}';
   const r = await chat([{ role: 'system', content: system }, { role: 'user', content: JSON.stringify(dossier) }], { json: true });
   const view = extractJson(r.content);
-  const NARR = path.join(VAULT_ROOT, 'Efforts', 'Active', 'Celsus OS', 'runs', 'narrations'); ensureDir(NARR);
+  const NARR = path.join(RUNS, 'narrations'); ensureDir(NARR);
   fs.writeFileSync(path.join(NARR, e.title.replace(/[\/\\]/g, '-') + '.json'), JSON.stringify({ model: r.model, latencyMs: r.latencyMs, at: new Date().toISOString(), usage: r.usage, dossier, view, raw: view ? undefined : r.content }, null, 1));
   console.log(JSON.stringify({ model: r.model, latencyMs: r.latencyMs, usage: r.usage && { prompt: r.usage.prompt_tokens, completion: r.usage.completion_tokens, cost: r.usage.cost }, reasoningChars: r.reasoningChars }));
   console.log(view ? JSON.stringify(view, null, 1) : 'NO JSON, raw:\n' + r.content);

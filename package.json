@@ -1,12 +1,12 @@
 {
   "name": "celsus-os",
   "type": "module",
-  "description": "Celsus OS: a knowledge base OS over an Obsidian vault. Map it as a graph, answer short decisions, let it learn how you decide, and let a pixel mascot answer questions in interface blocks.",
-  "version": "0.1.0",
+  "description": "A knowledge base OS for a folder of markdown. Maps it as a graph, has a calibrated classifier judge every call, and turns what it is unsure about into one card at a time for a human to answer. It learns the answers and writes its own decision policy back into the folder.",
+  "version": "0.2.0",
   "bin": {
-    "celsus": "./bin/celsus",
-    "celsus-os": "./cli.ts"
+    "celsus": "./bin/celsus"
   },
+  "main": "./cli.ts",
   "engines": {
     "node": ">=22.18"
   },
@@ -15,21 +15,19 @@
     "doctor": "node cli.ts doctor",
     "run": "node cli.ts run",
     "serve": "node cli.ts serve",
-    "restart": "node cli.ts restart"
+    "typecheck": "tsc --noEmit --allowImportingTsExtensions --module esnext --target es2022 --moduleResolution bundler --skipLibCheck *.ts"
   },
-  "license": "MIT",
-  "repository": {
-    "type": "git",
-    "url": "https://github.com/Champ-Deep/celsus-os.git"
-  },
-  "homepage": "https://github.com/Champ-Deep/celsus-os",
   "keywords": [
     "obsidian",
     "knowledge-graph",
     "second-brain",
+    "knowledge-base",
     "jev",
     "typesafe",
     "openrouter",
+    "local-llm",
+    "ollama",
+    "human-in-the-loop",
     "generative-ui"
   ],
   "files": [
@@ -37,10 +35,22 @@
     "bin",
     "ui",
     "docs",
+    "install.sh",
     "README.md",
+    "SECURITY.md",
     "TESTING.md",
     "CONTRIBUTING.md",
-    "LICENSE",
-    "install.sh"
-  ]
+    "LICENSE"
+  ],
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Champ-Deep/celsus-os.git"
+  },
+  "homepage": "https://github.com/Champ-Deep/celsus-os",
+  "bugs": {
+    "url": "https://github.com/Champ-Deep/celsus-os/issues"
+  },
+  "dependencies": {},
+  "devDependencies": {}
 }

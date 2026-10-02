@@ -7,11 +7,12 @@ import { VAULT_ROOT } from './vault.ts';
 import { chat, extractJson } from './llm.ts';
 import { decide } from './jev.ts';
 import { standingRules, bestPractices } from './policy.ts';
+import { folderForKind } from './kinds.ts';
 
 export type NoteKind = 'person' | 'company' | 'client' | 'product' | 'effort' | 'note';
+const VALID_KINDS: NoteKind[] = ['person', 'company', 'client', 'product', 'effort', 'note'];
 
 const TEMPLATE: Record<NoteKind, string> = { person: 'Template - Person', company: 'Template - Company', client: 'Template - Client', product: 'Template - Product', effort: 'Template - Effort', note: '' };
-const FOLDER: Record<NoteKind, string> = { person: 'Atlas/People', company: 'Atlas/Companies', client: 'Atlas/Clients', product: 'Atlas/Products', effort: 'Efforts/Active', note: 'Inbox' };
 /** Fields that make a note useful for its kind; same list infoLevel scores on. */
 export const REQUIRED: Record<NoteKind, string[]> = { person: ['role', 'company', 'relationship'], company: ['industry', 'aliases', 'stage'], client: ['status', 'company-served-by', 'key-contacts'], product: ['stage', 'tech-stack', 'company'], effort: ['status', 'company', 'target-date'], note: ['type', 'tags'] };
 
@@ -20,7 +21,7 @@ export interface Draft { name: string; kind: NoteKind; folder: string; file: str
 
 const safeName = (s: string) => s.replace(/[\/\\:*?"<>|]/g, ' ').replace(/\s+/g, ' ').trim().replace(/^\.+/, '').trim().slice(0, 120);
 export function targetFile(name: string, kind: NoteKind): { folder: string; file: string } {
-  const n = safeName(name); const folder = kind === 'effort' ? path.join(FOLDER.effort, n) : FOLDER[kind] || FOLDER.note;
+  const n = safeName(name); const folder = folderForKind(kind, n, VAULT_ROOT);
   return { folder, file: path.join(folder, n + '.md') };
 }
 function template(kind: NoteKind): string {
@@ -46,7 +47,7 @@ function extractMarkdown(text: string): { markdown: string; missing: any[] } | n
 const filledValue = (v: any) => v != null && (Array.isArray(v) ? v.length > 0 : String(v).trim().length > 0 && !/^\{\{/.test(String(v)));
 
 export async function draftNote(input: DraftInput): Promise<Draft> {
-  const name = safeName(input.name); const kind = (input.kind in FOLDER ? input.kind : 'note') as NoteKind;
+  const name = safeName(input.name); const kind = (VALID_KINDS.includes(input.kind as NoteKind) ? input.kind : 'note') as NoteKind;
   const { folder, file } = targetFile(name, kind); const exists = fs.existsSync(path.join(VAULT_ROOT, file));
   const today = new Date().toISOString().slice(0, 10);
   const tpl = template(kind).replace(/\{\{title\}\}/g, name).replace(/\{\{date\}\}/g, today);

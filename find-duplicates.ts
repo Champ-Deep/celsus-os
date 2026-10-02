@@ -4,18 +4,19 @@
 //   node find-duplicates.ts            writes duplicates.json and duplicates.md into the run folder. Never deletes.
 import fs from 'node:fs';
 import path from 'node:path';
-import { readVault, normalizeKey, VAULT_ROOT, ensureDir, todayStamp } from './vault.ts';
+import { readVault, normalizeKey, VAULT_ROOT, ensureDir, todayStamp, todayRunDir } from './vault.ts';
 import type { Note } from './vault.ts';
+import { kindOfPath } from './kinds.ts';
 import { buildGlossary, rank, resolveExact } from './glossary.ts';
 import { editRatio } from './match.ts';
 
-const OUT = path.join(VAULT_ROOT, 'Efforts', 'Active', 'Celsus OS', 'runs', todayStamp());
+const OUT = todayRunDir();
 type Verdict = 'delete_safe' | 'merge_then_delete' | 'different_thing' | 'rename' | 'alias_conflict';
 
 function bodyOf(n: Note) { return fs.readFileSync(path.join(VAULT_ROOT, n.path), 'utf8'); }
 function isStub(n: Note, body: string) { return n.tags.includes('auto-stub') || /Stub note|Auto-created by|Hub note created|_To fill in\._/.test(body) || body.split(/\s+/).length < 60; }
 function isPointer(body: string) { return /^#\s*Duplicate\b|This note has been filed at|Archived \d{4}-\d{2}-\d{2}\.\*\* No activity/m.test(body); }
-function isEffortHub(n: Note) { const parts = n.path.split('/'); return n.path.startsWith('Efforts/') && parts.length >= 3 && parts[parts.length - 2] === n.basename; }
+function isEffortHub(n: Note) { return kindOfPath(n.path, { basename: n.basename, frontmatterType: n.type }) === 'effort'; }
 
 function main() {
   const notes = readVault(); const byPath = new Map(notes.map(n => [n.path, n]));
@@ -72,7 +73,7 @@ function main() {
     for (const r of xs) L.push(`| ${r.duplicate} | ${r.canonical} | ${r.reason} | ${r.path_form_inbound} |`);
     L.push('');
   }
-  fs.writeFileSync(path.join(OUT, 'duplicates.md'), L.join('\n').replace(/[—–]/g, '-'));
+  fs.writeFileSync(path.join(OUT, 'duplicates.md'), L.join('\n').replace(/[\u2014\u2013]/g, '-'));
   console.log(JSON.stringify({ groups: groups.size, duplicates: rows.length, counts: rows.reduce((m, r) => (m[r.verdict] = (m[r.verdict] || 0) + 1, m), {} as Record<string, number>) }));
 }
 main();

@@ -1,14 +1,14 @@
 // Celsus OS, Phase 1 runner: the entity and title normalizer.
 // Collects every entity mention in the vault (wikilink targets, company fields, task context and effort tags),
 // resolves the exact ones by rule, shortlists the rest locally, and asks Jev only to pick among the shortlist.
-// Shadow mode: nothing in the vault is edited. Outputs land in Efforts/Active/Celsus OS/runs/<date>/.
+// Shadow mode: nothing in the vault is edited. Outputs land in today's run folder under the Celsus home (todayRunDir in vault.ts).
 //
 //   node normalize-entities.ts                 dry run, rules and shortlists only, no network
 //   node normalize-entities.ts --live          also ask Jev (names and titles only leave the machine)
 //   node normalize-entities.ts --live --limit 200 --min-count 2 --concurrency 8
 import fs from 'node:fs';
 import path from 'node:path';
-import { readVault, normalizeKey, VAULT_ROOT, ensureDir, todayStamp } from './vault.ts';
+import { readVault, normalizeKey, ensureDir, todayStamp, todayRunDir } from './vault.ts';
 import type { Note } from './vault.ts';
 import { buildGlossary, keyCollisions, resolveExact } from './glossary.ts';
 import type { Glossary } from './glossary.ts';
@@ -27,7 +27,7 @@ const LIVE = flag('--live');
 const LIMIT = parseInt(opt('--limit', '400'), 10);
 const MIN_COUNT = parseInt(opt('--min-count', '1'), 10);
 const CONCURRENCY = parseInt(opt('--concurrency', '8'), 10);
-const OUT = opt('--out', path.join(VAULT_ROOT, 'Efforts', 'Active', 'Celsus OS', 'runs', todayStamp()));
+const OUT = opt('--out', todayRunDir());
 const THRESHOLDS = { merge: { p: 0.85, confidence: 0.6 }, newEntity: { p: 0.7 } }; // initial, replaced by the calibration curve
 
 type MentionKind = 'wikilink' | 'company_field' | 'task_context' | 'task_effort';

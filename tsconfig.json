@@ -1,0 +1,17 @@
+{
+  "compilerOptions": {
+    "target": "es2022",
+    "module": "esnext",
+    "moduleResolution": "bundler",
+    "allowImportingTsExtensions": true,
+    "noEmit": true,
+    "skipLibCheck": true,
+    "strict": false,
+    "erasableSyntaxOnly": true,
+    "verbatimModuleSyntax": false,
+    "types": ["node"],
+    "lib": ["es2023", "dom"]
+  },
+  "include": ["*.ts"],
+  "exclude": ["node_modules", ".celsus"]
+}

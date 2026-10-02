@@ -3,6 +3,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { VAULT_ROOT, normalizeKey } from './vault.ts';
+import { kindOfPath } from './kinds.ts';
 import type { Note } from './vault.ts';
 
 export type EntityKind = 'company' | 'person' | 'product' | 'client' | 'effort' | 'project' | 'note';
@@ -10,21 +11,8 @@ export interface Entity { id: string; title: string; kind: EntityKind; folder: s
 export interface Glossary { entities: Entity[]; byId: Map<string, Entity>; byKey: Map<string, string[]>; registry: Map<string, string[]> }
 
 export function kindOf(n: Note): EntityKind {
-  if (n.path.startsWith('Atlas/Companies/')) return 'company';
-  if (n.path.startsWith('Atlas/People/')) return 'person';
-  if (n.path.startsWith('Atlas/Products/')) return 'product';
-  if (n.path.startsWith('Atlas/Clients/')) return 'client';
-  if (n.path.startsWith('Projects/')) return 'project';
-  if (n.path.startsWith('Efforts/')) {
-    const parts = n.path.split('/');
-    const parent = parts[parts.length - 2];
-    if (parent === n.basename || n.type === 'effort') return 'effort';
-  }
-  if (n.type === 'person') return 'person';
-  if (n.type === 'company') return 'company';
-  if (n.type === 'product') return 'product';
-  if (n.type === 'client') return 'client';
-  return 'note';
+  const k = kindOfPath(n.path, { basename: n.basename, frontmatterType: n.type });
+  return (k === 'meeting' || k === 'doc' ? 'note' : k) as EntityKind;
 }
 
 /** Parse the alias registry table in _config/link-policy.md: "| Written as | Link as |". */

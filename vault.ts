@@ -3,10 +3,55 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { CONFIG_PATH, loadConfig } from './config.ts';
 
 export const HERE = path.dirname(fileURLToPath(import.meta.url));
-function configuredVault(): string | undefined { try { const c = JSON.parse(fs.readFileSync(path.join(process.env.HOME || process.env.USERPROFILE || '', '.celsus-os', 'config.json'), 'utf8')); return c.vaultPath || undefined; } catch { return undefined; } }
+function configuredVault(): string | undefined {
+  // Read through config.ts so CELSUS_CONFIG is honoured. Hand-rolling the path here meant CI, and
+  // anyone pointing a second vault at a different config file, could not.
+  try { const c = JSON.parse(fs.readFileSync(CONFIG_PATH, 'utf8')); return c.vaultPath || undefined; } catch { return undefined; }
+}
 export const VAULT_ROOT = process.env.VAULT_PATH || configuredVault() || path.resolve(HERE, '..', '..', '..');
+
+// ---------- where Celsus keeps its own state ----------
+// This was the literal string 'Efforts/Active/Celsus OS/runs' in eight files, which meant the app
+// only worked inside one person's vault. Two functions decide it now, from config and then from the
+// shape of the vault in front of us, so a teammate with no Efforts folder still gets a home.
+const CELSUS_HOME_NAME = 'Celsus OS';
+function resolveHomeDir(): string {
+  const cfg = loadConfig();
+  if (process.env.CELSUS_HOME_DIR) return process.env.CELSUS_HOME_DIR;
+  if (cfg?.runsPath) return path.dirname(String(cfg.runsPath).replace(/[/\\]runs$/, ''));
+  // Keep the established layout when the vault already has it, so an existing install keeps its
+  // history, its Decision Policy note and its label log exactly where they are.
+  if (fs.existsSync(path.join(VAULT_ROOT, 'Efforts', 'Active'))) return path.join(VAULT_ROOT, 'Efforts', 'Active', CELSUS_HOME_NAME);
+  return path.join(VAULT_ROOT, CELSUS_HOME_NAME);
+}
+export const CELSUS_HOME = resolveHomeDir();
+export const RUNS = process.env.CELSUS_RUNS || path.join(CELSUS_HOME, 'runs');
+/** Relative path of the folder holding the Decision Policy note, so the walker can skip its own state. */
+const HOME_REL = path.relative(VAULT_ROOT, CELSUS_HOME).split(path.sep).join('/');
+export function todayRunDir() { return path.join(RUNS, todayStamp()); }
+
+/**
+ * How many markdown files sit under a folder, ignoring the things a vault accumulates that are not
+ * knowledge: dot folders, plugins, dependencies. Used by setup to tell the owner what they pointed
+ * at, and by doctor to prove the folder is not empty.
+ */
+export function countMarkdown(root: string): number {
+  let n = 0;
+  const stack = [root];
+  const skip = new Set(['node_modules', '.git', '.obsidian', '.trash']);
+  while (stack.length) {
+    const d = stack.pop()!;
+    let ents: fs.Dirent[]; try { ents = fs.readdirSync(d, { withFileTypes: true }); } catch { continue; }
+    for (const e of ents) {
+      if (e.isDirectory()) { if (!skip.has(e.name) && !e.name.startsWith('.')) stack.push(path.join(d, e.name)); }
+      else if (e.isFile() && e.name.endsWith('.md')) n++;
+    }
+  }
+  return n;
+}
 
 const SKIP_DIRS = new Set(['studio', 'node_modules', 'runs', 'Excalidraw', '_to_delete', 'Scheduled', 'Artifacts', 'Claude outputs']);
 const SKIP_PREFIX = ['.', '_ARCHIVE'];
@@ -35,6 +80,8 @@ export function walk(dir = VAULT_ROOT, rel = ''): string[] {
   for (const ent of fs.readdirSync(dir, { withFileTypes: true })) {
     const relPath = rel ? `${rel}/${ent.name}` : ent.name;
     if (ent.isDirectory()) {
+      // Never map our own state: the Decision Policy note and the label log are outputs, not vault knowledge.
+      if (relPath === HOME_REL || relPath.startsWith(HOME_REL + '/')) continue;
       if (SKIP_DIRS.has(ent.name) || SKIP_PREFIX.some(p => ent.name.startsWith(p)) || SKIP_PATHS.includes(relPath)) continue;
       out.push(...walk(path.join(dir, ent.name), relPath));
     } else if (ent.isFile() && ent.name.endsWith('.md')) {
@@ -163,8 +210,7 @@ export function ensureDir(p: string) { fs.mkdirSync(p, { recursive: true }); }
 
 /** The most recent run folder that holds the given file, so readers do not depend on the clock. */
 export function latestRunWith(file: string): string | null {
-  const root = path.join(VAULT_ROOT, 'Efforts', 'Active', 'Celsus OS', 'runs');
-  if (!fs.existsSync(root)) return null;
-  const dirs = fs.readdirSync(root).filter(d => fs.existsSync(path.join(root, d, file))).sort();
-  return dirs.length ? path.join(root, dirs[dirs.length - 1]) : null;
+  if (!fs.existsSync(RUNS)) return null;
+  const dirs = fs.readdirSync(RUNS).filter(d => fs.existsSync(path.join(RUNS, d, file))).sort();
+  return dirs.length ? path.join(RUNS, dirs[dirs.length - 1]) : null;
 }

@@ -3,7 +3,7 @@
 //   node suggest-links.ts --live [--limit 150] [--min-shared 3]
 import fs from 'node:fs';
 import path from 'node:path';
-import { readVault, normalizeKey, VAULT_ROOT, ensureDir, todayStamp, latestRunWith } from './vault.ts';
+import { readVault, normalizeKey, ensureDir, latestRunWith, todayRunDir } from './vault.ts';
 import { buildGlossary } from './glossary.ts';
 import { tokens } from './match.ts';
 import { decide, decideAll } from './jev.ts';
@@ -16,7 +16,7 @@ const opt = (n: string, d: string) => { const i = args.indexOf(n); return i >= 0
 const LIVE = flag('--live');
 const LIMIT = parseInt(opt('--limit', '150'), 10);
 const MIN_SHARED = parseInt(opt('--min-shared', '3'), 10);
-const OUT = opt('--out', path.join(VAULT_ROOT, 'Efforts', 'Active', 'Celsus OS', 'runs', todayStamp()));
+const OUT = opt('--out', todayRunDir());
 const ENTITY_KINDS = new Set(['company', 'person', 'product', 'client', 'effort', 'project']);
 
 async function main() {

@@ -5,7 +5,7 @@
 //   node suggest-owners.ts --live [--concurrency 6] [--out DIR]
 import fs from 'node:fs';
 import path from 'node:path';
-import { readVault, normalizeKey, VAULT_ROOT, ensureDir, todayStamp } from './vault.ts';
+import { readVault, normalizeKey, ensureDir, todayRunDir } from './vault.ts';
 import { buildGlossary } from './glossary.ts';
 import { decide, decideAll, JEV_MODEL } from './jev.ts';
 import type { Question } from './jev.ts';
@@ -16,7 +16,7 @@ const flag = (n: string) => args.includes(n);
 const opt = (n: string, d: string) => { const i = args.indexOf(n); return i >= 0 && args[i + 1] ? args[i + 1] : d; };
 const LIVE = flag('--live');
 const CONCURRENCY = parseInt(opt('--concurrency', '6'), 10);
-const OUT = opt('--out', path.join(VAULT_ROOT, 'Efforts', 'Active', 'Celsus OS', 'runs', todayStamp()));
+const OUT = opt('--out', todayRunDir());
 const BANDS = { auto: 0.9, review: 0.6 };
 
 async function main() {
@@ -30,7 +30,11 @@ async function main() {
   criteria.none = 'No single company or client owns this, or it belongs to one not listed';
   const q: Record<string, Question> = { owner: { type: 'choice', instructions: 'Which company or client does this effort belong to? Judge from the title, tags and the notes it links to.', criteria } };
   const labels = labelIndex();
-  const targets = g.entities.filter(e => e.kind === 'effort' && e.id.startsWith('Efforts/Active/') && !byPath.get(e.id)?.company && !labels.has('owner:' + e.id));
+  // Every effort without a company gets an owner question, except finished or archived work: naming an
+  // owner on something that is already done is noise. The exclusion is by segment name, not by path,
+  // so it holds in a vault that does not use an Efforts folder.
+  const finished = /(completed|done|archive|archived)/i;
+  const targets = g.entities.filter(e => e.kind === 'effort' && !finished.test(e.id) && !byPath.get(e.id)?.company && !labels.has('owner:' + e.id));
   const items = targets.map(e => {
     const n = byPath.get(e.id)!;
     const linked = Array.from(new Set(n.links.map(l => l.target.split('/').pop()!).filter(t => g.byKey.has(normalizeKey(t))))).slice(0, 20);

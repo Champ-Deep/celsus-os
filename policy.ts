@@ -5,14 +5,14 @@
 // Ollama Modelfile, all regenerated after every answer, so Laya is continuously trained on the rules and best practices.
 import fs from 'node:fs';
 import path from 'node:path';
-import { VAULT_ROOT } from './vault.ts';
+import { CELSUS_HOME, RUNS as VAULT_RUNS } from './vault.ts';
 import { loadConfig } from './config.ts';
 
-export const RUNS = path.join(VAULT_ROOT, 'Efforts', 'Active', 'Celsus OS', 'runs');
+export const RUNS = VAULT_RUNS;
 export const LABELS = path.join(RUNS, 'labels.jsonl');
 export const RULES = path.join(RUNS, 'rules.json');
-export const POLICY = path.join(VAULT_ROOT, 'Efforts', 'Active', 'Celsus OS', 'Decision Policy.md');
-export const BEST_PRACTICES = path.join(VAULT_ROOT, 'Efforts', 'Active', 'Celsus OS', 'Laya Best Practices.md');
+export const POLICY = path.join(CELSUS_HOME, 'Decision Policy.md');
+export const BEST_PRACTICES = path.join(CELSUS_HOME, 'Laya Best Practices.md');
 export const LAYA = path.join(RUNS, 'laya');
 
 export interface Label { id: string; choice: string; pattern: string; source: 'human' | 'rule'; at: string; q?: string }

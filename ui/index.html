@@ -106,6 +106,23 @@ canvas.map{display:block;width:100%;height:100%;cursor:grab}
 .why{font-size:12.5px;color:var(--text-dim);border-left:2px solid var(--brass);padding-left:10px;margin:0}
 .answers{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px}
 .ans{border:1.5px solid var(--line-strong);border-radius:10px;padding:14px;background:var(--surface);text-align:left;color:var(--text);display:grid;gap:4px;cursor:pointer}.ans:hover{border-color:var(--brass)}
+
+/* decide: what-it-is-unsure-about toggle, and the swipe affordance on the card */
+.sortbar{display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin:0 0 12px}
+.sortbar .eyebrow{color:var(--brass)}
+#sortSeg{display:flex;border:1px solid var(--line-strong);border-radius:8px;overflow:hidden}
+#sortSeg button{border:0;border-radius:0;padding:7px 13px;background:var(--surface);color:var(--text-dim);font-size:12px;cursor:pointer;font-family:inherit}
+#sortSeg button+button{border-left:1px solid var(--line-strong)}
+#sortSeg button.on{background:var(--brass);color:var(--brass-ink);font-weight:600}
+.sortnote{font-size:12px;color:var(--text-muted);flex:1;min-width:220px}
+.card .conf{font-family:"IBM Plex Mono",monospace;color:var(--warn);font-size:12px;letter-spacing:0}
+.swipehint{font-size:11.5px;color:var(--text-muted);border-top:1px dashed var(--line);padding-top:10px;display:flex;gap:6px;flex-wrap:wrap;align-items:center}
+.swipehint b{font-family:"IBM Plex Mono",monospace;color:var(--brass);background:var(--brass-soft);border-radius:5px;padding:1px 6px}
+#swipeCard{touch-action:pan-y;user-select:none;-webkit-user-select:none;cursor:grab}
+#swipeCard:active{cursor:grabbing}
+#swipeCard.sw-good{border-color:var(--good);box-shadow:0 0 0 2px var(--good) inset,var(--shadow)}
+#swipeCard.sw-up{border-color:var(--partof);box-shadow:0 0 0 2px var(--partof) inset,var(--shadow)}
+#swipeCard.sw-bad{border-color:var(--warn);box-shadow:0 0 0 2px var(--warn) inset,var(--shadow)}
 .ans.lead{background:var(--brass-soft);border-color:var(--brass)}.ans.lead .k{color:var(--brass)}
 .ans .k{font-family:"IBM Plex Mono",monospace;font-size:11px;color:var(--text-muted)}.ans b{font-weight:600}.ans small{color:var(--text-dim);font-size:12px}
 .cardfoot{display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;font-size:12px;color:var(--text-muted)}
@@ -120,6 +137,14 @@ canvas.map{display:block;width:100%;height:100%;cursor:grab}
 .empty{padding:40px;color:var(--text-muted);text-align:center}
 /* lists */
 .list{padding:var(--gutter);max-width:1100px}.list h2{font-size:20px;margin-bottom:4px}.sub{font-size:12px;color:var(--text-muted);margin-bottom:12px}
+/* health: the measured dashboard. Bars animate with transform so a repaint never triggers layout. */
+.kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;margin-bottom:8px}
+.kpi{border:1px solid var(--line);border-radius:10px;background:var(--surface);padding:12px 14px;display:grid;gap:2px}
+.kpi b{font-family:"IBM Plex Mono",monospace;font-size:24px;font-weight:500;line-height:1.1}
+.kpi span{font-size:11px;letter-spacing:.07em;text-transform:uppercase;color:var(--text-dim);font-weight:600}
+.kpi small{font-size:11.5px;color:var(--text-muted)}
+.meter{display:inline-block;width:56px;height:6px;border-radius:3px;background:var(--surface-2);overflow:hidden;vertical-align:middle;margin-right:6px}
+.meter i{display:block;height:100%;background:var(--brass);transform-origin:left center;transform:scaleX(0);transition:transform .45s cubic-bezier(.2,.8,.3,1)}
 .rows{border:1px solid var(--line);border-radius:10px;overflow:hidden;background:var(--surface)}
 .row{display:grid;grid-template-columns:auto 1fr auto auto;gap:10px;align-items:center;padding:8px 10px;border-bottom:1px solid var(--line);font-size:13px}.row:last-child{border-bottom:0}
 .row .c{font-family:"IBM Plex Mono",monospace;color:var(--text-dim);font-size:12px;white-space:nowrap}.row .sp{color:var(--text-muted);font-size:11.5px}
@@ -145,6 +170,7 @@ canvas.map{display:block;width:100%;height:100%;cursor:grab}
     <nav>
       <button class="on" data-s="graph">Graph</button>
       <button data-s="decide">Decide <span class="cnt" id="cDeck">0</span></button>
+      <button data-s="health">Health <span class="cnt" id="cHealth">0</span></button>
       <button data-s="missing">Missing notes <span class="cnt" id="cGhost">0</span></button>
       <button data-s="dups">Duplicates <span class="cnt" id="cDup">0</span></button>
       <button data-s="rules">Rules <span class="cnt" id="cRules">0</span></button>
@@ -166,6 +192,33 @@ canvas.map{display:block;width:100%;height:100%;cursor:grab}
       </div>
     </section>
     <section class="screen" id="decide"><div class="deckwrap"><div id="cardHost"></div><div class="learned" id="learned"></div></div></section>
+    <section class="screen" id="health"><div class="list">
+      <h2>What is strong, what is missing</h2>
+      <div class="sub" id="healthSub">Measured from the folder and the latest run, not from a stored opinion.</div>
+      <div class="kpis" id="healthKpis"></div>
+      <h2 style="margin-top:26px">Strongest folders</h2>
+      <div class="sub">Highest reachability: the share of their notes that something else in the folder points at. This is the number that changes behaviour, because one orphaned folder can average out to a healthy looking vault.</div>
+      <div class="rows" id="healthBest"></div>
+      <h2 style="margin-top:26px">Weakest folders</h2>
+      <div class="sub">Same measure, lowest first. Folders of three notes or more, so a single stray file is not called a problem.</div>
+      <div class="rows" id="healthWorst"></div>
+      <h2 style="margin-top:26px">Every folder</h2>
+      <div class="rows" id="healthFolders"></div>
+      <h2 style="margin-top:26px">What the map is made of</h2>
+      <div class="rows" id="healthKinds"></div>
+      <h2 style="margin-top:26px">Files at the root</h2>
+      <div class="sub">Not folders, so reachability per note does not apply. Listed by how much of the vault points at them.</div>
+      <div class="rows" id="healthRoot"></div>
+      <h2 style="margin-top:26px">Most referenced notes</h2>
+      <div class="sub">The hubs a link following agent reaches first. A high number here is good, as long as the note behind it is worth arriving at.</div>
+      <div class="rows" id="healthHubs"></div>
+      <h2 style="margin-top:26px">Named but never written down</h2>
+      <div class="sub">Referenced across the folder, no note exists. Each one is a gap an agent cannot answer from what is on disk.</div>
+      <div class="rows" id="healthGhosts"></div>
+      <h2 style="margin-top:26px">What the classifier is unsure about</h2>
+      <div class="sub">Open questions grouped by shape. A long bar is a decision you keep making by hand, and a candidate for a standing rule.</div>
+      <div class="rows" id="healthPatterns"></div>
+    </div></section>
     <section class="screen" id="missing"><div class="list"><h2>Linked from your notes, but no note exists</h2><div class="sub">Ranked by links. Icon is Jev's type. Create note asks you for two lines of context, Laya drafts the note from the vault template, Jev checks it is complete enough, then it is saved into the right folder. <button class="btn primary" id="newNote" style="margin-left:8px">New note…</button></div><div class="rows" id="ghostRows"></div></div></section>
     <section class="screen" id="dups"><div class="list"><h2>Duplicate and colliding notes</h2><div class="sub" id="dupSub"></div><div class="rows" id="dupRows"></div><h2 style="margin-top:28px">Archived</h2><div class="sub">Moved to Other/Archive/Deleted by date. Out of the graph, still on disk, one click to restore.</div><div class="rows" id="archRows"></div></div></section>
     <section class="screen" id="rules"><div class="list"><h2>What the store has learned</h2><div class="sub">A rule decides for you at confidence 0.90 with support 5. Undo on a decided card lowers it. Notes you add travel into the Decision Policy, the Jev briefing, and Laya's training set.</div><div class="rows" id="ruleRows"></div><div class="laya" id="layaBox"></div></div></section>
@@ -220,9 +273,10 @@ const css = v => getComputedStyle(document.documentElement).getPropertyValue(v).
 const VAULT = 'Celsus';
 const obs = p => 'obsidian://open?vault=' + encodeURIComponent(VAULT) + '&file=' + encodeURIComponent(p.replace(/\.md$/, ''));
 const obsNew = name => 'obsidian://new?vault=' + encodeURIComponent(VAULT) + '&name=' + encodeURIComponent(name);
-let state = null, hops = 1, showSug = true, showLabels = false; const kinds = new Set(['person','company','client','effort','product','project']);
+let state = null, health = null, hops = 1, showSug = true, showLabels = false; const kinds = new Set(['person','company','client','effort','product','project']);
 const store = { get(k, d){ try { const v = localStorage.getItem('celsus.'+k); return v==null ? d : JSON.parse(v); } catch { return d; } }, set(k, v){ try { localStorage.setItem('celsus.'+k, JSON.stringify(v)); } catch {} } };
 const VIS_DEF = { link:70, spring:4, rep:16000, coll:2.2, node:100, edge:70, cap:45, look:'tinted' }; let VIS = Object.assign({}, VIS_DEF, store.get('visuals', {}));
+const plural = (n, one, many) => n === 1 ? one : (many || one + 's');
 function toast(m){ const t=$('#toast'); t.textContent=m; t.classList.add('on'); clearTimeout(t._t); t._t=setTimeout(()=>t.classList.remove('on'),1600); }
 async function api(p, body){ const r = await fetch(p, body ? {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)} : undefined); return r.json(); }
 function esc(s){ return String(s??'').replace(/[&<>"]/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
@@ -267,9 +321,9 @@ function petState(st, ms){ for (const m of [pet, petFab]) if (m) m.set(st, ms ? 
 function mountAskPet(){ const c = $('#petAsk'); if (c && window.CelsusMascot) { petAsk = new CelsusMascot(c, {scale: 3}); petAsk.set('ask'); } }
 
 // ---------- navigation ----------
-document.querySelectorAll('.rail nav button').forEach(b => b.onclick = () => { document.querySelectorAll('.rail nav button').forEach(x=>x.classList.toggle('on', x===b)); document.querySelectorAll('.screen').forEach(s=>s.classList.toggle('on', s.id===b.dataset.s)); if (b.dataset.s==='graph') resize(); });
+document.querySelectorAll('.rail nav button').forEach(b => b.onclick = async () => { document.querySelectorAll('.rail nav button').forEach(x=>x.classList.toggle('on', x===b)); document.querySelectorAll('.screen').forEach(s=>s.classList.toggle('on', s.id===b.dataset.s)); if (b.dataset.s==='graph') resize(); if (b.dataset.s==='health') { await loadHealth(); renderHealth(); } });
 async function refresh(){
-  state = await api('/api/state');
+  state = await api('/api/state?sort=' + (localStorage.getItem('celsus.sort') || 'unsure'));
   $('#mode').textContent = state.llmBaseUrl ? 'local model' : 'local';
   if (!state.configured) { $('#viewBody').innerHTML = '<b>Model not set up.</b> Open <a href="#" id="openSetup">Settings → Models</a>, paste your OpenRouter key, keep Space Bunny Alpha, Save. Then ask again.'; openPanel('#viewp'); const l=$('#openSetup'); if(l) l.onclick=e=>{e.preventDefault(); $('#gearBtn').click(); document.querySelector('.tabs button[data-t=models]').click();}; }
   $('#tele').innerHTML = `<span class="pill">run <b>${esc(state.run)}</b></span><span class="pill"><b>${state.notes.toLocaleString()}</b> notes</span><span class="pill"><b>${state.resolved.toLocaleString()}</b> resolved</span><span class="pill"><b>${state.cardsPer100}</b> cards / 100</span><span class="pill">${esc((state.llm||'').split('/').pop())}</span>`;
@@ -285,16 +339,31 @@ function ruleRow(r){ return `<div class="rule" data-p="${esc(r.pattern)}">${crum
 function bindRuleRows(root){ root.querySelectorAll('.rule').forEach(row => { const note=row.querySelector('.note'); row.querySelector('.fb').onclick=()=>{ note.classList.toggle('on'); if(note.classList.contains('on')) note.querySelector('textarea').focus(); }; row.querySelector('.cancel').onclick=()=>note.classList.remove('on'); row.querySelector('.save').onclick=async()=>{ const text=note.querySelector('textarea').value.trim(); if(!text) return; const r=await api('/api/rule-note',{pattern:row.dataset.p,text}); toast(r.ok?'Noted. It is in the policy now.':'Failed'); petState('speak',1500); refresh(); }; }); }
 function renderDeck(){
   const host = $('#cardHost'); const c = state.deck[0];
-  if (!c) { host.innerHTML = '<div class="empty">Deck is empty. Run the scripts again to generate new cards.</div>'; }
-  else host.innerHTML = `<div class="card">
-    <div class="eyebrow">Card 1 of ${state.deckSize} · ${c.kind} · impact ${c.impact}</div>
+  const sort = state.sort || 'unsure';
+  const bar = `<div class="sortbar">
+      <span class="eyebrow">Show me</span>
+      <div class="seg" id="sortSeg">
+        <button data-sort="unsure" class="${sort==='unsure'?'on':''}">What it is unsure about</button>
+        <button data-sort="impact" class="${sort==='impact'?'on':''}">Biggest impact first</button>
+      </div>
+      <span class="sortnote">${sort==='unsure'
+        ? `Least confident first. ${state.deckSize} cards pending; Jev runs ${(Math.min(...state.deck.map(c=>c.p??1))).toFixed(2)} to ${(Math.max(...state.deck.map(c=>c.p??1))).toFixed(2)} on this page. These are the ones only you can settle.`
+        : `Widest blast radius first: most shared neighbours, most links moved. The old default.`}</span>
+    </div>`;
+  if (!c) { host.innerHTML = bar + '<div class="empty">Deck is empty. Run the scripts again to generate new cards.</div>'; }
+  else host.innerHTML = bar + `<div class="card" id="swipeCard">
+    <div class="eyebrow">Card 1 of ${state.deckSize} · ${c.kind} · ${sort==='unsure' ? `Jev confidence <b class="conf">${(c.p??1).toFixed(2)}</b>` : `impact ${c.impact}`}</div>
     <div class="qrow"><canvas id="petAsk"></canvas><p class="q">${esc(c.q)}</p></div>
     <div class="ctx">${c.ctx.map(x=>`<span>${esc(x)}</span>`).join('')}</div>
     <p class="why">Why you are seeing this: ${esc(c.why)}</p>
     <div class="answers">${c.options.map((o,i)=>`<button class="ans ${i===0&&c.p>=0.85?'lead':''}" data-k="${esc(o.key)}"><span class="k">${i+1}${i===0&&c.p>=0.85?' · recommended':''}</span><b>${esc(o.label)}</b><small>${esc(o.hint||'')}</small></button>`).join('')}</div>
     <div class="cardfoot"><span>Answered ${state.answered} · decided for you ${state.decidedForYou.length}</span><span>${c.nodes.map(n=>`<a class="btn" href="${obs(n)}">Open ${esc(n.split('/').pop().replace(/\.md$/,''))}</a>`).join(' ')}</span></div>
+    <div class="swipehint">Swipe the card: <b>→</b> ${esc(swipePick(c,'right').label)} · <b>↑</b> ${esc(swipePick(c,'up').label)} · <b>←</b> ${esc(swipePick(c,'left').label)} · or press 1 to ${c.options.length}</div>
   </div>`;
   host.querySelectorAll('.ans').forEach(b => b.onclick = () => answer(c.id, b.dataset.k));
+  const seg = $('#sortSeg');
+  if (seg) seg.querySelectorAll('button').forEach(b => b.onclick = () => { localStorage.setItem('celsus.sort', b.dataset.sort); refresh(); });
+  bindSwipe(c);
   mountAskPet();
   const L = $('#learned');
   L.innerHTML = `<div class="eyebrow">What the store has learned</div>` + (state.rules.length ? state.rules.slice(0,6).map(ruleRow).join('') : '<div class="rule" style="color:var(--text-muted)">Nothing yet. Every answer teaches a pattern.</div>')
@@ -302,8 +371,101 @@ function renderDeck(){
   bindRuleRows(L);
   L.querySelectorAll('u').forEach(u => u.onclick = async () => { await api('/api/undo',{id:u.dataset.id}); toast('Undone, rule lowered'); refresh(); });
 }
+
+// ---------- swipe ----------
+// Which option a direction picks. Right takes the first option, up the middle one, left a plain
+// negative. Left must never land on a destructive option by accident: 'Not an entity' hides the
+// term from now on, so it scans from the end for no / different / skip and only falls back to the
+// last option when a card carries none of those. The hint under the card reads from the same
+// function, so what it promises is what a swipe does.
+const SWIPE_NEGATIVE = ['no', 'different', 'skip', 'keep'];
+function swipePick(c, dir){
+  const o = c.options || []; if (!o.length) return { key:'', label:'' };
+  if (dir === 'right') return o[0];
+  if (dir === 'up') return o[1] || o[o.length - 1];
+  for (let i = o.length - 1; i >= 0; i--) {
+    const k = (o[i].key || '').toLowerCase();
+    if (SWIPE_NEGATIVE.some(n => k === n || k.startsWith(n))) return o[i];
+  }
+  return o[o.length - 1];
+}
+// Pointer based so it works with a trackpad drag, a mouse drag and a finger. Below the threshold
+// the card springs back and nothing is recorded, so a stray drag never costs a label.
+function bindSwipe(c){
+  const el = $('#swipeCard'); if (!el || !c || !c.options || !c.options.length) return;
+  const TH = 90, MAX = 150;
+  const dirOf = (dx, dy) => Math.abs(dx) >= Math.abs(dy) ? (dx > 0 ? 'right' : 'left') : (dy < 0 ? 'up' : 'down');
+  const optFor = dir => swipePick(c, dir);
+  let id = null, x0 = 0, y0 = 0, dx = 0, dy = 0, live = false, dir = null;
+  const paint = () => {
+    el.style.transform = (dx || dy) ? `translate(${dx}px,${dy}px) rotate(${dx/28}deg)` : '';
+    el.style.transition = live ? 'none' : 'transform .22s cubic-bezier(.2,.9,.3,1.2)';
+    el.classList.toggle('sw-good', dir === 'right');
+    el.classList.toggle('sw-up', dir === 'up');
+    el.classList.toggle('sw-bad', dir === 'left');
+  };
+  el.addEventListener('pointerdown', e => {
+    if (e.target.closest('a,button,textarea,input')) return;
+    id = e.pointerId; x0 = e.clientX; y0 = e.clientY; dx = dy = 0; dir = null; live = true;
+    el.setPointerCapture(id); paint();
+  });
+  el.addEventListener('pointermove', e => {
+    if (id === null || e.pointerId !== id) return;
+    dx = e.clientX - x0; dy = e.clientY - y0;
+    if (Math.abs(dx) > 6 || Math.abs(dy) > 6) dir = dirOf(dx, dy);
+    const cap = Math.min(Math.max(Math.abs(dx), Math.abs(dy)), MAX);
+    if (dir === 'left') dx = -cap; else if (dir === 'right') dx = cap; else if (dir === 'up') dy = -cap; else dy = 0;
+    paint();
+  });
+  const finish = e => {
+    if (id === null || (e && e.pointerId !== id)) return;
+    const d = dir; id = null; live = false;
+    const far = d === 'left' ? -dx : d === 'right' ? dx : -dy;
+    const o = d ? optFor(d) : null;
+    if (!d || far < TH || !o) { dx = dy = 0; dir = null; paint(); return; }
+    el.style.transition = 'transform .18s ease-out, opacity .18s ease-out';
+    const fly = d === 'left' ? -420 : d === 'right' ? 420 : 0;
+    el.style.transform = `translate(${fly}px,${d==='up'?-520:0}px) rotate(${d==='left'?-14:14}deg)`;
+    el.style.opacity = '0';
+    const key = o.key;
+    setTimeout(() => answer(c.id, key), 150);
+  };
+  el.addEventListener('pointerup', finish);
+  el.addEventListener('pointercancel', finish);
+}
 async function answer(id, choice){ const r = await api('/api/answer',{id,choice}); if (r.error) { toast(r.label ? 'That card was already answered; moving on' : r.error); refresh(); return; } toast(r.rule ? `Saved. Rule now ${r.rule.confidence} (${r.rule.support})` : 'Saved'); petState(r.rule && r.rule.auto ? 'celebrate' : 'speak', 1800); refresh(); }
 document.addEventListener('keydown', e => { if (!$('#decide').classList.contains('on') || e.target.tagName==='TEXTAREA' || e.target.tagName==='INPUT') return; const i = parseInt(e.key,10); const btns = document.querySelectorAll('#cardHost .ans'); if (i>=1 && i<=btns.length) btns[i-1].click(); });
+function renderHealth(){
+  const h = health; const host = $('#healthKpis');
+  if (!h) { host.innerHTML = '<div class="empty">Loading the measurement...</div>'; return; }
+  $('#healthSub').innerHTML = `Run <b>${esc(h.run || 'none yet')}</b>. ${h.notes.toLocaleString()} ${plural(h.notes,'note')}, ${h.words.toLocaleString()} ${plural(h.words,'word')}, ${h.entities.toLocaleString()} ${plural(h.entities,'entity','entities')}, ${h.links.toLocaleString()} wikilinks of which <b>${h.linkRate}%</b> point at something that exists. ${h.deck.pending} open ${plural(h.deck.pending,'question')}, <b>${h.deck.unsure}</b> of ${plural(h.deck.pending,'it')} below 0.70 confidence.`;
+  const kpi = (label, value, note) => `<div class="kpi"><b>${esc(value)}</b><span>${esc(label)}</span><small>${esc(note || '')}</small></div>`;
+  host.innerHTML = [
+    kpi('notes', h.notes.toLocaleString(), h.fresh30d + ' touched in 30 days'),
+    kpi('linked notes', h.coverage + '%', h.unlinkedNotes + ' point at nothing'),
+    kpi('entities', h.entities.toLocaleString(), h.byKind.length + ' ' + plural(h.byKind.length, 'kind')),
+    kpi('named, never written', h.ghosts, h.ghosts ? 'no note exists yet' : 'every name has a note'),
+    kpi('open questions', h.deck.pending, h.deck.unsure + ' below 0.70'),
+    kpi('answered by you', h.answered, h.autoDecided + ' decided by a rule'),
+  ].join('');
+  const bar = (v, max) => `<span class="meter"><i style="transform:scaleX(${max ? Math.max(0.02, Math.min(1, v / max)) : 0})"></i></span>`;
+  const maxReach = Math.max(...h.folders.filter(x => !x.root).map(x => x.reach), 1);
+  const folderRow = f => `<div class="row" style="grid-template-columns:1fr 90px 70px 110px">
+      <span><b>${esc(f.folder)}</b> <span class="sp">${f.notes} ${plural(f.notes,'note')}, ${(f.words/1000).toFixed(0)}k words</span></span>
+      <span class="c">${bar(f.reach, maxReach)} ${f.reach}</span>
+      <span class="c">${f.density} out</span>
+      <span class="c">${f.inbound} in</span></div>`;
+  const list = (el, arr) => { const n = $(el); n.innerHTML = arr.length ? arr.map(folderRow).join('') : '<div class="empty">Nothing measured yet.</div>'; };
+  list('#healthBest', h.best); list('#healthWorst', h.worst); list('#healthFolders', h.folders);
+  $('#healthKinds').innerHTML = h.byKind.map(k => `<div class="row" style="grid-template-columns:120px 1fr 60px"><span class="tag ${esc(k.kind)}">${esc(k.kind)}</span>${bar(k.count, Math.max(...h.byKind.map(x=>x.count),1))}<span class="c">${k.count}</span></div>`).join('');
+  $('#healthRoot').innerHTML = h.rootFiles.length ? h.rootFiles.map(f => `<div class="row" style="grid-template-columns:1fr 120px 70px"><span><b>${esc(f.folder)}</b></span>${bar(f.inbound, Math.max(...h.rootFiles.map(x=>x.inbound),1))}<span class="c">${f.inbound} in</span></div>`).join('') : '<div class="empty">No markdown at the root of the folder.</div>';
+  $('#healthHubs').innerHTML = h.topHubs.map(x => `<div class="row" style="grid-template-columns:1fr 90px 60px"><span><b>${esc(x.title)}</b> <span class="sp">${esc(x.id)}</span></span>${bar(x.inbound, Math.max(...h.topHubs.map(y=>y.inbound),1))}<span class="c">${x.inbound}</span></div>`).join('');
+  $('#healthGhosts').innerHTML = h.topUnresolved.length ? h.topUnresolved.map(x => `<div class="row" style="grid-template-columns:1fr 70px 90px"><span><b>${esc(x.name)}</b></span><span class="tag ${esc(x.type||'note')}">${esc(x.type||'note')}</span><span class="c">${x.count} ${plural(x.count,'link')}</span></div>`).join('') : '<div class="empty">No unresolved names. Every link points at a note that exists.</div>';
+  $('#healthPatterns').innerHTML = h.deck.byPattern.length ? h.deck.byPattern.map(x => `<div class="row" style="grid-template-columns:1fr 120px 50px"><span class="mono" style="font-size:11.5px">${esc(x.pattern)}</span>${bar(x.n, Math.max(...h.deck.byPattern.map(y=>y.n),1))}<span class="c">${x.n}</span></div>`).join('') : '<div class="empty">No open questions. The deck is clear.</div>';
+}
+
+async function loadHealth(){ try { health = await api('/api/health'); const c = $('#cHealth'); if (c && health) c.textContent = health.deck.pending; renderHealth(); } catch (e) { health = null; } }
+
 function renderRules(){ const R=$('#ruleRows'); R.innerHTML = state.rules.length ? state.rules.map(r=>`<div class="row" style="grid-template-columns:1fr">${ruleRow(r)}</div>`).join('') : '<div class="empty">No rules yet.</div>'; bindRuleRows(R); const L=$('#layaBox'); if (L && state.laya) L.innerHTML = `<b style="color:var(--text)">Laya is trained on this store.</b> ${state.laya.examples} training examples, the standing and forming rules, and your <i>Laya Best Practices</i> note are rewritten into <span class="mono">runs/laya</span> after every answer. Refresh the local model (base ${esc(state.laya.base)}) with <code>ollama create celsus-laya -f "${esc(state.laya.modelfile)}"</code> then point Settings, Models, Local model at <span class="mono">celsus-laya</span>.`; }
 
 // ---------- missing and duplicates ----------
