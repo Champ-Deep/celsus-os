@@ -10,6 +10,7 @@
 <a href="#how-it-learns">How it learns</a> ·
 <a href="#privacy">Privacy</a> ·
 <a href="docs/TEAM-GUIDE.md">Team guide</a> ·
+<a href="docs/BACKLOG.md">Backlog</a> ·
 <a href="SECURITY.md">Security</a> ·
 <a href="TESTING.md">Testing guide</a> ·
 <a href="docs/REFERENCE.md">Full reference</a> ·
