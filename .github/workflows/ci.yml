@@ -1,0 +1,210 @@
+# Celsus OS CI. Syntax, module graph, house rule, then a real end-to-end run against a synthetic
+# vault. No secrets, no uploads, no network calls of its own.
+#
+# There is deliberately no install step. The app has zero runtime dependencies and no build step:
+# it is TypeScript run directly by Node's type stripping. `npm ci` would install nothing and prove
+# nothing, so it is not here. If package.json ever grows a dependencies block, this file is wrong and
+# needs a real install.
+
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    name: ${{ matrix.os }} / node ${{ matrix.node }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+        node: [22, 24]
+
+    steps:
+      - name: Check out the repo
+        uses: actions/checkout@v4
+
+      - name: Set up Node ${{ matrix.node }}
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node }}
+
+      - name: Assert Node is 22.18 or newer
+        # 22.18 is the floor because that is the first release where Node strips TypeScript types
+        # by default. Anything older cannot run this code at all.
+        run: |
+          node -e '
+            const [maj, min] = process.versions.node.split(".").map(Number);
+            if (maj < 22 || (maj === 22 && min < 18)) {
+              console.error("Celsus OS needs Node 22.18 or newer, because Node runs the TypeScript directly.");
+              console.error("Found Node " + process.versions.node + ".");
+              console.error("Fix: use actions/setup-node with node-version 22.18 or higher.");
+              process.exit(1);
+            }
+            console.log("Node " + process.versions.node + " ok.");
+          '
+
+      - name: No install step, on purpose
+        run: echo "Zero runtime dependencies by design. Nothing to install."
+
+      - name: Parse every .ts file
+        # node --check is a no-op for ES modules: it returns 0 on a file with a syntax error as long
+        # as the file has an import or export. So the check is done properly here. Strip the types
+        # with Node own stripper, then parse the result with the ES module parser. No execution, no
+        # dependencies, and a real syntax error in any file fails the job.
+        run: |
+          node --experimental-vm-modules --no-warnings -e '
+            import fs from "node:fs";
+            import vm from "node:vm";
+            import { stripTypeScriptTypes } from "node:module";
+            const files = fs.readdirSync(".").filter(f => f.endsWith(".ts")).sort();
+            if (!files.length) { console.error("No .ts files found. Is this the repo root?"); process.exit(1); }
+            let bad = 0;
+            for (const f of files) {
+              try {
+                const src = stripTypeScriptTypes(fs.readFileSync(f, "utf8"), { mode: "strip" });
+                new vm.SourceTextModule(src, { identifier: f });
+              } catch (e) {
+                bad++;
+                console.error("  FAIL " + f + ": " + String(e.message).split("\n")[0]);
+              }
+            }
+            console.log(files.length + " file(s) parsed, " + bad + " failed.");
+            process.exit(bad ? 1 : 0);
+          '
+
+      - name: Import the library modules
+        # Parsing proves each file is valid on its own. Importing proves the module graph resolves,
+        # which is what actually caught a renamed export during development. Only modules with no
+        # side effects are imported: the entry scripts (cli, serve, doctor, setup and the four run
+        # passes) execute on import and are covered by the smoke test below instead.
+        run: |
+          for m in config vault glossary match llm jev policy metrics archive notes; do
+            node -e "import('./$m.ts').then(() => console.log('  ok   $m')).catch(e => { console.error('  FAIL $m: ' + e.message.split('\n')[0]); process.exit(1); })" || exit 1
+          done
+
+      - name: Entry point prints help
+        # cli.ts with no subcommand prints usage and exits 0. Subcommands are deliberately not
+        # invoked here: setup is interactive and the run passes make model calls.
+        run: node cli.ts > /dev/null && echo "  ok   cli.ts"
+
+      - name: No em dash or en dash in any .ts file
+        # House rule of this repo. The scan strips only the one legitimate exception first: a
+        # replace() call whose character class exists precisely to normalise those characters to a
+        # hyphen, such as the report writers. Everything else fails the build.
+        run: |
+          python3 - <<'PY'
+          import glob, re, sys
+
+          NORMALISER = re.compile(r"\.replace\(\s*/\[[^\]]*\][^/]*/[gimsuy]*,\s*['\"]-['\"]\s*\)")
+          offenders = []
+          for f in sorted(glob.glob("*.ts")):
+              hits = []
+              for i, line in enumerate(open(f, encoding="utf8"), 1):
+                  if "\u2014" in line or "\u2013" in line:
+                      rest = NORMALISER.sub("", line)
+                      if "\u2014" in rest or "\u2013" in rest:
+                          hits.append(i)
+              if hits:
+                  offenders.append((f, hits))
+          if offenders:
+              for f, hits in offenders:
+                  print("  FAIL %s: U+2014 or U+2013 on line(s) %s" % (f, ", ".join(map(str, hits))))
+              print("Use a period, a comma, a colon, or restructure the sentence.")
+              sys.exit(1)
+          print("  ok   no em dash or en dash in any .ts file")
+          PY
+
+      - name: Build a synthetic vault
+        run: |
+          VAULT="$RUNNER_TEMP/celsus-vault"
+          rm -rf "$VAULT"
+          mkdir -p "$VAULT/People" "$VAULT/Companies"
+          printf -- '---\ntype: person\n---\n# Uma Shankar\n\nWorks with [[SPAN Global Services]] on [[Acme Data]].\n' > "$VAULT/People/Uma Shankar.md"
+          printf -- '---\ntype: company\naliases: [SPAN]\n---\n# SPAN Global Services\n\nKnown as [[SPAN]]. Linked from [[Uma Shankar]].\n' > "$VAULT/Companies/SPAN Global Services.md"
+          printf -- '# Acme Data\n\nA client account. See [[SPAN Global Services]] and [[Uma Shankar]].\n' > "$VAULT/Companies/Acme Data.md"
+          echo "  ok   3 notes with wikilinks in $VAULT"
+
+      - name: Point the app at the synthetic vault
+        # An obvious placeholder that authenticates nothing. No secret is read, and doctor runs with
+        # --no-network, so nothing leaves the runner. No repository or environment secret is used.
+        run: |
+          CFG="$RUNNER_TEMP/celsus-config"
+          mkdir -p "$CFG"
+          cat > "$CFG/config.json" <<JSON
+          {
+            "openrouterKey": "sk-or-v1-ci-placeholder-not-a-real-key",
+            "classifier": "typesafe/jev-1.13",
+            "llm": "stealth/space-bunny-alpha",
+            "llmMaxTokens": 6000,
+            "vaultPath": "$RUNNER_TEMP/celsus-vault",
+            "createdAt": "2026-01-01T00:00:00.000Z"
+          }
+          JSON
+          echo "VAULT_PATH=$RUNNER_TEMP/celsus-vault" >> "$GITHUB_ENV"
+          echo "CELSUS_CONFIG=$CFG/config.json" >> "$GITHUB_ENV"
+
+      - name: Run the doctor against the synthetic vault
+        run: node cli.ts doctor --no-network
+
+      - name: Boot the server and assert the API
+        run: |
+          node serve.ts --port 3099 > "$RUNNER_TEMP/serve.log" 2>&1 &
+          SPID=$!
+          trap 'kill $SPID 2>/dev/null || true' EXIT
+
+          CODE=000
+          i=0
+          while [ $i -lt 60 ]; do
+            i=$((i + 1))
+            sleep 0.5
+            CODE=$(curl -s -o "$RUNNER_TEMP/state.json" -w '%{http_code}' http://localhost:3099/api/state || echo 000)
+            if [ "$CODE" = "200" ]; then break; fi
+            if ! kill -0 $SPID 2>/dev/null; then
+              echo "  FAIL the server exited before answering."
+              cat "$RUNNER_TEMP/serve.log"
+              exit 1
+            fi
+          done
+
+          if [ "$CODE" != "200" ]; then
+            echo "  FAIL GET /api/state returned HTTP $CODE after $i attempt(s), expected 200."
+            cat "$RUNNER_TEMP/serve.log"
+            exit 1
+          fi
+          echo "  ok   GET /api/state returned 200 after $i attempt(s)"
+
+          python3 - "$RUNNER_TEMP/state.json" <<'PY'
+          import json, sys
+          d = json.load(open(sys.argv[1]))
+          missing = [k for k in ("deckSize", "notes") if k not in d]
+          print("  notes=%s deckSize=%s run=%s" % (d.get("notes"), d.get("deckSize"), d.get("run") or "none"))
+          if missing:
+              print("  FAIL /api/state JSON is missing: " + ", ".join(missing))
+              sys.exit(1)
+          if not isinstance(d["notes"], int) or not isinstance(d["deckSize"], int):
+              print("  FAIL notes and deckSize must be numbers.")
+              sys.exit(1)
+          if d["notes"] < 3:
+              print("  FAIL expected the 3 synthetic notes to be read, got %r." % d["notes"])
+              sys.exit(1)
+          print("  ok   payload has deckSize and notes")
+          PY
+
+          echo "  server said: $(head -1 "$RUNNER_TEMP/serve.log")"
+          kill $SPID 2>/dev/null || true
+          trap - EXIT
+
+      - name: Nothing was uploaded
+        run: echo "This workflow reads no secrets and uploads no artifacts."

@@ -9,7 +9,12 @@ import { readVault, normalizeKey, VAULT_ROOT, latestRunWith, HERE } from './vaul
 import type { Note } from './vault.ts';
 import { buildGlossary } from './glossary.ts';
 import type { Glossary, Entity } from './glossary.ts';
-import { writePolicy, POLICY } from './policy.ts';
+// State location comes from vault.ts, which resolves it from config and then from the shape of the
+// folder, and is re-exported here. It used to be redefined in this file as the literal old path, which
+// split the brain: policy.ts read and wrote rules under the resolved path while this file wrote every
+// answer under the literal, so on a folder with a different shape the first swipe would create a second
+// state tree that the learner never reads.
+import { writePolicy, POLICY, RUNS, LABELS, RULES } from './policy.ts';
 import { chat, extractJson } from './llm.ts';
 import { loadConfig, saveConfig } from './config.ts';
 import { draftNote, saveNote } from './notes.ts';
@@ -18,9 +23,6 @@ import { archiveDuplicate, restoreArchived, listArchived } from './archive.ts';
 
 const args = process.argv.slice(2);
 const PORT = parseInt((args[args.indexOf('--port') + 1] || '3043'), 10) || 3043;
-const RUNS = path.join(VAULT_ROOT, 'Efforts', 'Active', 'Celsus OS', 'runs');
-const LABELS = path.join(RUNS, 'labels.jsonl');
-const RULES = path.join(RUNS, 'rules.json');
 const AUTO = { confidence: 0.9, support: 5 };
 
 const loadJson = (p: string | null, fb: any) => { try { return p ? JSON.parse(fs.readFileSync(p, 'utf8')) : fb; } catch { return fb; } };
@@ -265,7 +267,19 @@ const server = http.createServer(async (req, res) => {
       const topRules = Object.entries(rules).map(([pattern, r]: any) => ({ pattern, ...r })).sort((a, b) => b.support - a.support).slice(0, 12);
       return send(res, 200, { llm: loadConfig()?.llm, llmBaseUrl: loadConfig()?.llmBaseUrl || '', configured: !!loadConfig()?.openrouterKey, run: path.basename(latestRunWith('resolutions.json') || ''), notes: notes.length, resolved: Object.keys(resolutions).length, ghosts: ghosts.length, sort, deck: deck.slice(0, 60), deckSize: deck.length, totalCards: total, decidedForYou: labels.filter(l => l.source === 'rule').slice(-10).reverse(), answered: human.length, rules: topRules, unsure: deck.slice(0, 60).filter((c: any) => (c.p ?? 1) < 0.7).length, cardsPer100: (decisions.length + links.length + owners.length + dups.length) ? +((deck.length / (decisions.length + links.length + owners.length + dups.length)) * 100).toFixed(1) : 0, dupCounts: dups.reduce((m: any, r: any) => { m[r.verdict] = (m[r.verdict] || 0) + 1; return m; }, {}), laya: layaInfo() });
     }
-    if (p === '/api/answer' && req.method === 'POST') { const b = await readBody(req); const prior = labelled().get(b.id); if (prior) return send(res, 409, { error: 'already answered', label: prior }); const card = buildCards().deck.find((c: any) => c.id === b.id); if (!card) return send(res, 404, { error: 'card not in deck' }); const l = { id: b.id, choice: b.choice, pattern: card.pattern, source: 'human', at: new Date().toISOString(), q: card.q }; labels.push(l); fs.mkdirSync(RUNS, { recursive: true }); fs.appendFileSync(LABELS, JSON.stringify(l) + '\n'); if (b.choice !== 'skip') ruleUpdate(card.pattern, b.choice, 1); writePolicy(); return send(res, 200, { ok: true, rule: rules[card.pattern] }); }
+    if (p === '/api/answer' && req.method === 'POST') {
+      const b = await readBody(req);
+      const prior = labelled().get(b.id);
+      if (prior) return send(res, 409, { error: 'already answered', label: prior });
+      const card = buildCards().deck.find((c: any) => c.id === b.id);
+      if (!card) return send(res, 404, { error: 'card not in deck' });
+      // The answer is a pattern to learn from, and a pattern is only meaningful if it names a meaning:
+      // "same:Atlas/People/X.md" or "ignore". An unchecked write here poisons the store permanently,
+      // because the policy note renders every stored answer and throws on the next start, taking the
+      // app down with a bad value that was accepted once. Checked at the door instead.
+      if (typeof b.choice !== 'string' || !(card.options || []).some((o: any) => o.key === b.choice)) {
+        return send(res, 400, { error: 'choice must be one of the card options', options: (card.options || []).map((o: any) => o.key) });
+      } const l = { id: b.id, choice: b.choice, pattern: card.pattern, source: 'human', at: new Date().toISOString(), q: card.q }; labels.push(l); fs.mkdirSync(RUNS, { recursive: true }); fs.appendFileSync(LABELS, JSON.stringify(l) + '\n'); if (b.choice !== 'skip') ruleUpdate(card.pattern, b.choice, 1); writePolicy(); return send(res, 200, { ok: true, rule: rules[card.pattern] }); }
     if (p === '/api/undo' && req.method === 'POST') { const b = await readBody(req); const i = labels.map(l => l.id).lastIndexOf(b.id); if (i < 0) return send(res, 404, { error: 'no label' }); const [l] = labels.splice(i, 1); fs.writeFileSync(LABELS, labels.map(x => JSON.stringify(x)).join('\n') + (labels.length ? '\n' : '')); if (l.choice !== 'skip') ruleUpdate(l.pattern, l.choice, -1); if (l.source === 'rule') ruleUpdate(l.pattern, l.choice, -1); writePolicy(); return send(res, 200, { ok: true }); }
     if (p === '/api/graph') { const ks = url.searchParams.get('kinds'); const ent = url.searchParams.get('entity') || ''; if (!ent || normalizeKey(ent) === VAULT_KEY) return send(res, 200, overviewGraph(parseInt(url.searchParams.get('cap') || '60', 10), ks ? new Set(ks.split(',').filter(Boolean)) : undefined)); return send(res, 200, egoGraph(ent, parseInt(url.searchParams.get('hops') || '1', 10), parseInt(url.searchParams.get('cap') || '70', 10), ks ? new Set(ks.split(',').filter(Boolean)) : undefined)); }
     if (p === '/api/ask' && req.method === 'POST') { const b = await readBody(req); if (!b.question) return send(res, 400, { error: 'question required' }); return send(res, 200, await ask(String(b.question).slice(0, 500), typeof b.focus === 'string' ? b.focus : undefined, Array.isArray(b.history) ? b.history : [])); }
