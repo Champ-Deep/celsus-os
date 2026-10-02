@@ -35,21 +35,22 @@ The key looks like `sk-or-v1-...`. One key per person. There is no shared accoun
 curl -fsSL https://raw.githubusercontent.com/Champ-Deep/celsus-os/main/install.sh | sh
 ```
 
-That URL is the intended home of the project. As of the writing of this guide it returns HTTP 404,
-because the repository has not been published yet, so the one-liner does not work today. Until it
-does, clone it and run the commands with `node cli.ts` instead of `celsus`:
+That URL is the home of the project and it works. The installer checks git and Node, refuses to
+continue on Node older than 22.18, clones into `~/.celsus-os/app`, symlinks `celsus` into
+`~/.local/bin`, and prints the line to add to your shell profile if that folder is not already on
+your PATH.
+
+If you would rather not pipe a script into a shell, clone it and run the commands with `node cli.ts`
+instead of `celsus`:
 
 ```sh
 git clone https://github.com/Champ-Deep/celsus-os.git
 cd celsus-os
 ```
 
-If you did get the one-liner to run, it does this: checks git and Node, refuses to continue on Node
-older than 22.18, clones into `~/.celsus-os/app`, symlinks `celsus` into `~/.local/bin`, and prints
-the line to add to `~/.zshrc` if that folder is not already on your PATH.
-
-You can override three installer variables if you need to: `CELSUS_REPO` (clone from somewhere else),
-`CELSUS_HOME` (install folder), `CELSUS_BIN` (where the `celsus` symlink goes).
+You can override four installer variables if you need to: `CELSUS_REPO` (clone from somewhere else),
+`CELSUS_HOME` (install folder), `CELSUS_BIN` (where the `celsus` symlink goes), and `CELSUS_VERSION`
+(the git ref to clone, `main` by default).
 
 ### 2. `celsus setup`
 
@@ -329,7 +330,7 @@ plainly and it goes straight to the owner rather than into a public issue.
 
 ## Honest status
 
-Version 0.1.0. The repository has not been published. The project has had no independent security
+Version 0.2.0. The project has had no independent security
 review and no independent accuracy review of the classifier. The cost figures quoted above are the
 repo's own testing notes, not a billing guarantee. Everything described here was read from the code in
 this repository, and the install and end-to-end steps in `.github/workflows/ci.yml` are run on every

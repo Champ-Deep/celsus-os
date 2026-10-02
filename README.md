@@ -9,6 +9,8 @@
 <a href="#what-you-see">What you see</a> ·
 <a href="#how-it-learns">How it learns</a> ·
 <a href="#privacy">Privacy</a> ·
+<a href="docs/TEAM-GUIDE.md">Team guide</a> ·
+<a href="SECURITY.md">Security</a> ·
 <a href="TESTING.md">Testing guide</a> ·
 <a href="docs/REFERENCE.md">Full reference</a> ·
 <a href="CONTRIBUTING.md">Contributing</a>
@@ -30,18 +32,20 @@ One line on macOS or Linux (needs git and Node 22.18 or newer):
 curl -fsSL https://raw.githubusercontent.com/Champ-Deep/celsus-os/main/install.sh | sh
 ```
 
-Then:
+Then four commands:
 
 ```sh
-celsus setup     # paste your OpenRouter key, point it at your vault, pick a model (a free one is the default)
+celsus setup     # paste your OpenRouter key, point it at your vault
 celsus doctor    # checks the machine end to end
 celsus run       # first pass over the vault, about 4 minutes for 3,000 notes
-celsus serve     # http://localhost:3043
+celsus serve     # the app at http://localhost:3043
 ```
+
+You need one OpenRouter key, Node 22.18 or newer (the app is TypeScript and Node runs it directly, so there is no build step and nothing to install), and git. Each person runs setup against their own vault with their own key; nothing is shared. `docs/TEAM-GUIDE.md` is the full handbook.
 
 Prefer a clone? `git clone https://github.com/Champ-Deep/celsus-os.git && cd celsus-os && node cli.ts setup`. Every `celsus` command is `node cli.ts` in the clone. `celsus update` pulls the latest version.
 
-You need one thing: an [OpenRouter](https://openrouter.ai) key. It pays for Jev (the classifier, about two cents for a whole vault pass) and, unless you run a local model, the narrator. The default narrator is free.
+That one key pays for two things: Jev, the classifier that judges every call and reports how sure it is (about two cents for a whole vault pass), and the writer that drafts notes. Jev is reached through OpenRouter by default; a TypeSafe key works too if you would rather call it there. A free hosted writer is the default, and if you have a local model running, setup finds it and offers to use it instead.
 
 ## The loop
 
@@ -51,7 +55,8 @@ Celsus runs four verbs over your vault, in order, and each one is a screen.
 |---|---|---|
 | **Understand** | The vault becomes a graph. Node size is how linked a note is (log scale), the ring is how complete it is, the icon is what kind of thing it is, and a halo means there is a decision waiting. Click anything and the owl tells you what it is connected to and what is pending. Ask a question and get an answer made of blocks. | Graph |
 | **Connect** | The normalizer resolves every mention to a canonical note (misspellings, initials, spacing, aliases), and Jev judges the ambiguous ones. A second pass finds pairs of notes that never link but clearly should, and suggests which company an effort belongs to. | Graph, Decide |
-| **Improve** | Every unresolved question becomes a flashcard: one at a time, keys 1 to 4, the recommended answer filled in when Jev is confident, and one line on why you are seeing it. Duplicates get an Archive button that moves the copy out of the graph and into a dated folder you can restore from. Nothing is ever deleted from disk. | Decide, Duplicates |
+| **Improve** | Every unresolved question becomes a flashcard: one at a time, keys 1 to 4, or drag the card. The deck is ordered least confident first, so the questions you are actually needed for are the ones you see. Swipe right takes the recommended answer, up takes the second, left takes a plain negative, and a drag that does not travel far enough records nothing at all. Duplicates get an Archive button that moves the copy out of the graph and into a dated folder you can restore from. Nothing is ever deleted from disk. | Decide, Duplicates |
+| **Measure** | The Health screen answers what is strong and what is missing, and it is measured rather than asserted: how much of the folder is linked, which folders almost nothing points at, what mix of things the vault actually holds, the notes everything else depends on, the names that have been written but never given a note, and how many questions are still open, grouped by shape. | Health |
 | **Add context** | Missing notes (things linked from everywhere that have no note) are ranked by how many links point at them. Create one from two lines of context: Laya, the writing model, fills your vault template and links what it recognises; Jev checks it is complete enough; you answer what is still missing and save. | Missing notes |
 
 ## What you see
@@ -62,7 +67,9 @@ Celsus runs four verbs over your vault, in order, and each one is a screen.
 
 **The owl.** A pixel mascot (five species, nine looks, all original, pick yours in Settings) that thinks, speaks, asks and celebrates. Its bubble is where answers land, where node summaries appear, and where you take decisions in place.
 
-**Decide.** One card. Why you are seeing it. Four answers. What the store has learned so far, and the decisions it made for you, with undo.
+**Decide.** One card. Why you are seeing it. How sure the classifier was. Four answers. What the store has learned so far, and the decisions it made for you, with undo. The card is a physical object: drag it right to take the recommended answer, up for the second, left for a plain negative. A drag that springs back records nothing, so a slip costs you nothing.
+
+**Health.** The measurement screen, and the honest one. Six numbers across the top, then what is strong and what is weak ranked by reachability rather than by average, the folders where almost nothing points at anything, what mix of things the vault actually holds, the notes the rest of the vault leans on hardest, the names that have been written many times and never given a note, and every open question grouped by its shape so you can see which kind of judgement the app is still weak at. Files sitting at the root of the folder are listed apart, because reachability per note means nothing for a single file.
 
 **Missing notes, Duplicates, Rules.** The three hygiene screens. Rules shows the patterns that have become standing rules, lets you add a note in your own words to any of them, and shows how many training examples Laya has.
 
@@ -87,6 +94,10 @@ The classifier (Jev, by TypeSafe, through OpenRouter) receives names and titles 
 ## For a team
 
 Each person installs, runs `celsus setup` against their own vault with their own key, and gets their own graph, deck and rules. Nothing is shared by default. The `TESTING.md` guide is the walk through to hand to a teammate on day one.
+
+## Status
+
+Version 0.2.0. The classifier is `typesafe/jev-1.13`, reached through OpenRouter's Decisions API; calling TypeSafe directly with your own key is optional and changes only where that call goes. The writing model is swappable: any OpenRouter model, or a local Ollama or LM Studio endpoint, in which case narration runs on your machine. This project has had no independent security review and no independent accuracy review of the classifier. The cost figures quoted above are the repo's own testing notes, not a billing guarantee. The repository is not published yet, so the install URL at the top of this file is the intended home rather than a working link.
 
 ## Contributing and the next front end
 

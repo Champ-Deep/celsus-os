@@ -137,14 +137,16 @@ jobs:
           echo "  ok   3 notes with wikilinks in $VAULT"
 
       - name: Point the app at the synthetic vault
-        # An obvious placeholder that authenticates nothing. No secret is read, and doctor runs with
-        # --no-network, so nothing leaves the runner. No repository or environment secret is used.
+        # A placeholder that authenticates nothing. No secret is read, no repository or environment
+        # secret is used, and --no-network keeps the job offline. The value is deliberately not
+        # shaped like a real key: nothing authenticates with it, and a credential-shaped string in a
+        # committed workflow would trip secret scanners for no reason.
         run: |
           CFG="$RUNNER_TEMP/celsus-config"
           mkdir -p "$CFG"
           cat > "$CFG/config.json" <<JSON
           {
-            "openrouterKey": "sk-or-v1-ci-placeholder-not-a-real-key",
+            "openrouterKey": "ci-placeholder-not-a-real-key",
             "classifier": "typesafe/jev-1.13",
             "llm": "stealth/space-bunny-alpha",
             "llmMaxTokens": 6000,
@@ -159,14 +161,9 @@ jobs:
         # A dry run is what makes the next step meaningful. On a fresh clone there is no state folder
         # and no run yet, and the doctor is right to fail both: it is reporting a machine that has not
         # been mapped, which is the truth until a run happens. So the run comes first, and it is a dry
-        # run so that it makes no model call and costs nothing.
-        run: node cli.ts run --dry
-
-      - name: Run one dry pass to create a real run folder
-        # --dry drops the --live flag from every pass, so nothing calls a model and nothing is
-        # billed, but all four passes really run and really write their output. That gives the
-        # doctor a run folder to find and the server a run to serve, so the rest of this job
-        # exercises the actual code path instead of a fixture.
+        # run so that it makes no model call and costs nothing. All four passes really execute and
+        # really write their output, so the doctor and the server below work on a real run folder
+        # rather than on a hand-written fixture.
         run: node cli.ts run --dry
 
       - name: Run the doctor against the synthetic vault

@@ -438,7 +438,7 @@ document.addEventListener('keydown', e => { if (!$('#decide').classList.contains
 function renderHealth(){
   const h = health; const host = $('#healthKpis');
   if (!h) { host.innerHTML = '<div class="empty">Loading the measurement...</div>'; return; }
-  $('#healthSub').innerHTML = `Run <b>${esc(h.run || 'none yet')}</b>. ${h.notes.toLocaleString()} ${plural(h.notes,'note')}, ${h.words.toLocaleString()} ${plural(h.words,'word')}, ${h.entities.toLocaleString()} ${plural(h.entities,'entity','entities')}, ${h.links.toLocaleString()} wikilinks of which <b>${h.linkRate}%</b> point at something that exists. ${h.deck.pending} open ${plural(h.deck.pending,'question')}, <b>${h.deck.unsure}</b> of ${plural(h.deck.pending,'it')} below 0.70 confidence.`;
+  $('#healthSub').innerHTML = `Run <b>${esc(h.run || 'none yet')}</b>. ${h.notes.toLocaleString()} ${plural(h.notes,'note')}, ${h.words.toLocaleString()} ${plural(h.words,'word')}, ${h.entities.toLocaleString()} ${plural(h.entities,'entity','entities')}, ${h.links.toLocaleString()} wikilinks of which <b>${h.linkRate}%</b> point at something that exists. ${h.deck.pending} open ${plural(h.deck.pending,'question')}, <b>${h.deck.unsure}</b> of them below 0.70 confidence.`;
   const kpi = (label, value, note) => `<div class="kpi"><b>${esc(value)}</b><span>${esc(label)}</span><small>${esc(note || '')}</small></div>`;
   host.innerHTML = [
     kpi('notes', h.notes.toLocaleString(), h.fresh30d + ' touched in 30 days'),
