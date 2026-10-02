@@ -155,6 +155,20 @@ jobs:
           echo "VAULT_PATH=$RUNNER_TEMP/celsus-vault" >> "$GITHUB_ENV"
           echo "CELSUS_CONFIG=$CFG/config.json" >> "$GITHUB_ENV"
 
+      - name: Map the synthetic vault, without calling a model
+        # A dry run is what makes the next step meaningful. On a fresh clone there is no state folder
+        # and no run yet, and the doctor is right to fail both: it is reporting a machine that has not
+        # been mapped, which is the truth until a run happens. So the run comes first, and it is a dry
+        # run so that it makes no model call and costs nothing.
+        run: node cli.ts run --dry
+
+      - name: Run one dry pass to create a real run folder
+        # --dry drops the --live flag from every pass, so nothing calls a model and nothing is
+        # billed, but all four passes really run and really write their output. That gives the
+        # doctor a run folder to find and the server a run to serve, so the rest of this job
+        # exercises the actual code path instead of a fixture.
+        run: node cli.ts run --dry
+
       - name: Run the doctor against the synthetic vault
         run: node cli.ts doctor --no-network
 
