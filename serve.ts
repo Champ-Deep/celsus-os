@@ -4,8 +4,9 @@
 // Writes: runs/labels.jsonl (every answer) and runs/rules.json (the rule store). Never edits a note.
 import http from 'node:http';
 import fs from 'node:fs';
+import os from 'node:os';
 import path from 'node:path';
-import { readVault, normalizeKey, VAULT_ROOT, latestRunWith, HERE } from './vault.ts';
+import { readVault, normalizeKey, VAULT_ROOT, latestRunWith, HERE, CELSUS_HOME, countMarkdown } from './vault.ts';
 import type { Note } from './vault.ts';
 import { buildGlossary } from './glossary.ts';
 import type { Glossary, Entity } from './glossary.ts';
@@ -16,7 +17,7 @@ import type { Glossary, Entity } from './glossary.ts';
 // state tree that the learner never reads.
 import { writePolicy, POLICY, RUNS, LABELS, RULES } from './policy.ts';
 import { chat, extractJson } from './llm.ts';
-import { loadConfig, saveConfig } from './config.ts';
+import { loadConfig, saveConfig, emptyConfig } from './config.ts';
 import { draftNote, saveNote } from './notes.ts';
 import type { NoteKind } from './notes.ts';
 import { archiveDuplicate, restoreArchived, listArchived } from './archive.ts';
@@ -287,6 +288,51 @@ const server = http.createServer(async (req, res) => {
       } const l = { id: b.id, choice: b.choice, pattern: card.pattern, source: 'human', at: new Date().toISOString(), q: card.q }; labels.push(l); fs.mkdirSync(RUNS, { recursive: true }); fs.appendFileSync(LABELS, JSON.stringify(l) + '\n'); if (b.choice !== 'skip') ruleUpdate(card.pattern, b.choice, 1); writePolicy(); return send(res, 200, { ok: true, rule: rules[card.pattern] }); }
     if (p === '/api/undo' && req.method === 'POST') { const b = await readBody(req); const i = labels.map(l => l.id).lastIndexOf(b.id); if (i < 0) return send(res, 404, { error: 'no label' }); const [l] = labels.splice(i, 1); fs.writeFileSync(LABELS, labels.map(x => JSON.stringify(x)).join('\n') + (labels.length ? '\n' : '')); if (l.choice !== 'skip') ruleUpdate(l.pattern, l.choice, -1); if (l.source === 'rule') ruleUpdate(l.pattern, l.choice, -1); writePolicy(); return send(res, 200, { ok: true }); }
     if (p === '/api/graph') { const ks = url.searchParams.get('kinds'); const ent = url.searchParams.get('entity') || ''; if (!ent || normalizeKey(ent) === VAULT_KEY) return send(res, 200, overviewGraph(parseInt(url.searchParams.get('cap') || '60', 10), ks ? new Set(ks.split(',').filter(Boolean)) : undefined)); return send(res, 200, egoGraph(ent, parseInt(url.searchParams.get('hops') || '1', 10), parseInt(url.searchParams.get('cap') || '70', 10), ks ? new Set(ks.split(',').filter(Boolean)) : undefined)); }
+    if (p === '/api/setup' && req.method === 'GET') {
+      // The first-run screen needs to know whether this install has been pointed at anything yet, and
+      // if not, what it fell back to. A new teammate with no config used to get HERE/../../.., which
+      // for the installed copy is the whole home directory: the app would walk their Documents and
+      // Desktop looking for markdown and say nothing. Now it says "not set up" instead.
+      const c = loadConfig();
+      const explicit = !!(process.env.VAULT_PATH || c?.vaultPath);
+      return send(res, 200, { configured: !!c, vaultSet: explicit, vaultPath: VAULT_ROOT, keySet: !!c?.openrouterKey, home: CELSUS_HOME });
+    }
+    if (p === '/api/vault/probe' && req.method === 'POST') {
+      // Check a candidate folder before committing to it, so the setup screen can say what is in
+      // there rather than making someone save, restart, and find out.
+      const b = await readBody(req);
+      const raw = String(b.path || '').trim().replace(/^~(?=$|\/)/, os.homedir());
+      if (!raw) return send(res, 400, { error: 'Give a folder path' });
+      const abs = path.resolve(raw);
+      if (!fs.existsSync(abs)) return send(res, 200, { path: abs, exists: false });
+      if (!fs.statSync(abs).isDirectory()) return send(res, 200, { path: abs, exists: true, isDir: false });
+      // Two counts, because they differ and the difference is legitimate. Every markdown file on
+      // disk is the raw count; the number Celsus will actually map is lower, since the walker skips
+      // its own state folder, dot folders and the archive. Quoting only the raw count would promise
+      // more notes than the app ever shows; quoting only the mapped one would need a full walk here.
+      const md = countMarkdown(abs);
+      let folders: string[] = [];
+      try { folders = fs.readdirSync(abs, { withFileTypes: true }).filter(e => e.isDirectory() && !e.name.startsWith('.')).map(e => e.name); } catch { /* unreadable subfolder, the count still stands */ }
+      return send(res, 200, { path: abs, exists: true, isDir: true, markdown: md, obsidian: fs.existsSync(path.join(abs, '.obsidian')), folders: folders.slice(0, 12) });
+    }
+    if (p === '/api/vault' && req.method === 'POST') {
+      // Point this install at a different folder. Refuses a path that does not exist, is not a
+      // folder, or holds no markdown, because the failure that causes is silent: the app starts,
+      // reports zero notes, and looks broken rather than misconfigured.
+      const b = await readBody(req);
+      const raw = String(b.path || '').trim().replace(/^~(?=$|\/)/, os.homedir());
+      if (!raw) return send(res, 400, { error: 'Give a folder path' });
+      const abs = path.resolve(raw);
+      if (!fs.existsSync(abs) || !fs.statSync(abs).isDirectory()) return send(res, 400, { error: 'No such folder: ' + abs });
+      const md = countMarkdown(abs);
+      if (md === 0) return send(res, 400, { error: 'No markdown files in ' + abs + '. Point at the folder that holds your notes, not its parent.' });
+      let c = loadConfig() || emptyConfig();
+      c.vaultPath = abs;
+      saveConfig(c);
+      // VAULT_ROOT and CELSUS_HOME are module constants read once at import, so the new folder takes
+      // effect on restart. Say so plainly rather than pretending the screen is already remapped.
+      return send(res, 200, { ok: true, vaultPath: abs, markdown: md, restart: true });
+    }
     if (p === '/api/ask' && req.method === 'POST') { const b = await readBody(req); if (!b.question) return send(res, 400, { error: 'question required' }); return send(res, 200, await ask(String(b.question).slice(0, 500), typeof b.focus === 'string' ? b.focus : undefined, Array.isArray(b.history) ? b.history : [])); }
     if (p === '/api/keycheck') { const c = loadConfig(); if (!c?.openrouterKey) return send(res, 200, { ok: false, why: 'no key saved' }); try { const r = await fetch('https://openrouter.ai/api/v1/auth/key', { headers: { Authorization: `Bearer ${c.openrouterKey}` } }); const j: any = r.ok ? await r.json() : null; return send(res, 200, { ok: r.ok, status: r.status, label: j?.data?.label, usage: j?.data?.usage, limit: j?.data?.limit, free: j?.data?.is_free_tier }); } catch (e) { return send(res, 200, { ok: false, why: String((e as Error).message) }); } }
     if (p === '/api/config' && req.method === 'GET') { const c = loadConfig(); return send(res, 200, c ? { vaultPath: c.vaultPath || VAULT_ROOT, classifier: c.classifier, llm: c.llm, llmBaseUrl: c.llmBaseUrl || '', hasKey: !!c.openrouterKey, keyTail: (c.openrouterKey || '').slice(-4) } : { vaultPath: VAULT_ROOT, hasKey: false }); }

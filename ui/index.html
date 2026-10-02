@@ -53,7 +53,7 @@ button{font:inherit}
 .canvas{background:var(--canvas)}
 .ask .subj{max-width:240px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;cursor:pointer}.ask .subj:not(.on){border-style:dashed}
 .qwrap{flex:1;position:relative;min-width:0}.qwrap input{width:100%}.qwrap .hint{position:absolute;right:12px;top:50%;transform:translateY(-50%);font-family:"IBM Plex Mono",monospace;font-size:11px;color:var(--text-muted);pointer-events:none}
-.seg2{display:flex;border:1px solid var(--line-strong);border-radius:8px;overflow:hidden}.seg2 .btn{border:0;border-radius:0;padding:8px 14px}.seg2 .go{border-radius:0;padding:8px 16px}
+.ask .qwrap{flex:1;min-width:0}
 .sugg{min-width:420px;max-height:50vh;overflow:auto}.sugg .pick{padding:6px 12px;font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--brass);border-bottom:1px solid var(--line);cursor:default}.sugg .pick:hover{background:none}
 .sugg div.row2{display:grid;grid-template-columns:auto 1fr auto auto;align-items:center;gap:10px}.sugg .dot{width:8px;height:8px;border-radius:50%;display:inline-block}.sugg em{font-style:normal;font-size:11px;color:var(--brass);border:1px solid var(--brass);border-radius:10px;padding:1px 8px;cursor:pointer}.sugg em:hover{background:var(--brass);color:var(--brass-ink)}
 .mgrid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px}.mgrid button{display:grid;justify-items:center;gap:4px;padding:8px 4px;border:1px solid var(--line-strong);border-radius:8px;background:var(--surface);color:var(--text-dim);cursor:pointer;font-size:11px}.mgrid button.on{border-color:var(--brass);background:var(--brass-soft);color:var(--text);font-weight:600}.mgrid canvas{width:52px;height:48px}
@@ -180,8 +180,8 @@ canvas.map{display:block;width:100%;height:100%;cursor:grab}
   </div>
   <div style="min-height:0;display:grid">
     <section class="screen on" id="graph">
-      <div class="ask"><span class="chip subj" id="subj" title="The subject Celsus is talking about. Click to change it.">whole vault</span><div class="qwrap"><input id="q" placeholder="A name to map, or a question to ask Celsus" autocomplete="off"><span class="hint" id="qhint"></span></div><div class="seg2"><button class="btn" id="goBtn">Map</button><button class="go" id="askBtn">Ask</button></div>
-        <div class="help">?<div class="tip"><dl><dt>Enter</dt><dd>maps a known name, otherwise asks the model</dd><dt>↑ ↓</dt><dd>move through suggestions, Enter picks</dd><dt>Map</dt><dd>draw the graph around a note</dd><dt>Ask</dt><dd>ask Celsus about whatever is typed</dd><dt>click</dt><dd>inspect a node</dd><dt>drag</dt><dd>move a node, neighbours follow</dd><dt>dbl click</dt><dd>pin or unpin</dd><dt>wheel</dt><dd>zoom around the cursor</dd><dt>/</dt><dd>focus this bar</dd><dt>subject chip</dt><dd>what follow ups are about; click to change</dd><dt>1 2 3 4</dt><dd>answer a card on Decide</dd></dl></div></div>
+      <div class="ask"><span class="chip subj" id="subj" title="The subject Celsus is talking about. Click to change it.">whole vault</span><div class="qwrap"><input id="q" placeholder="A name to map, or a question to ask Celsus" autocomplete="off"><span class="hint" id="qhint"></span></div></div>
+        <div class="help">?<div class="tip"><dl><dt>Enter</dt><dd>maps a known name, otherwise asks the model</dd><dt>Shift Enter</dt><dd>ask about a name instead of mapping it</dd><dt>↑ ↓</dt><dd>move through suggestions, Enter picks</dd><dt>click</dt><dd>inspect a node</dd><dt>drag</dt><dd>move a node, neighbours follow</dd><dt>dbl click</dt><dd>pin or unpin</dd><dt>wheel</dt><dd>zoom around the cursor</dd><dt>/</dt><dd>focus this bar</dd><dt>subject chip</dt><dd>what follow ups are about; click to change</dd><dt>1 2 3 4</dt><dd>answer a card on Decide</dd></dl></div></div>
         <div class="sugg" id="sugg"></div></div>
       <div class="toolbar"><span class="chip on" data-h="1">1 hop</span><span class="chip" data-h="2">2 hops</span><span class="sep"></span><span class="chip on" data-k="person">People</span><span class="chip on" data-k="company">Companies</span><span class="chip on" data-k="client">Clients</span><span class="chip on" data-k="effort">Efforts</span><span class="chip on" data-k="product">Products</span><span class="chip" data-k="meeting">Meetings</span><span class="chip" data-k="doc">Docs</span><span class="sep"></span><span class="chip on" id="chipSug">Suggested edges</span><span class="chip" id="chipLabels">All labels</span></div>
       <div class="canvas" id="canvasWrap"><canvas class="map" id="cv"></canvas>
@@ -232,7 +232,8 @@ canvas.map{display:block;width:100%;height:100%;cursor:grab}
     <div class="field"><label>Edge margin</label><input type="range" id="gutter" min="12" max="32" step="4" value="16"><span class="v" id="gutterV">16px</span></div>
     <div class="field"><label>Mascot</label><div class="mgrid" id="mascotSeg"></div><span></span></div>
     <div class="field"><label>Home entity</label><input type="text" id="homeEntity" placeholder="Whole vault, or an entity name"><button class="btn" id="saveHome">Save</button></div>
-    <div class="field"><label>Vault</label><span class="mono" id="vaultPath" style="font-size:12px;color:var(--text-dim)"></span><span></span></div>
+    <div class="field"><label>Folder</label><input type="text" id="vaultPath" placeholder="not set" spellcheck="false" style="font-size:12px"><button class="btn" id="changeVault">Change…</button></div>
+    <div class="field"><label>Celsus state</label><span class="mono" id="stateHome" style="font-size:12px;color:var(--text-dim)"></span><span></span></div>
   </div>
   <div class="tab" data-t="models">
     <div class="field"><label>Execution</label><div class="seg" id="execSeg"><button data-exec="api">External API</button><button data-exec="local">Local model</button></div><span></span></div>
@@ -256,6 +257,14 @@ canvas.map{display:block;width:100%;height:100%;cursor:grab}
     <div class="field"><label>Max nodes</label><input type="range" id="vCap" min="15" max="120" step="5" value="45"><span class="v" id="vCapV">45</span></div>
     <div class="field"><label></label><button class="btn" id="resetVisuals">Reset to defaults</button><span></span></div>
   </div>
+</div></div>
+<div class="modal" id="setupModal"><div class="dlg" style="max-width:560px">
+  <div class="dh"><h2>Point Celsus at a folder</h2><button class="btn" id="closeSetup">Close</button></div>
+  <p style="font-size:12px;color:var(--text-dim);margin:0 0 14px">Celsus maps one folder of markdown and keeps its own state in a <span class="mono">Celsus OS</span> folder inside it. An Obsidian vault works, but any folder of <span class="mono">.md</span> files does. You can change this later in Settings.</p>
+  <div class="field"><label>Folder</label><input type="text" id="vPath" placeholder="~/Documents/MyVault" autocomplete="off" spellcheck="false"><button class="btn" id="vProbe">Check</button></div>
+  <div id="vProbeOut" style="font-size:12px;color:var(--text-dim);margin:-6px 0 12px"></div>
+  <div class="field"><label></label><div style="display:flex;gap:6px"><button class="btn primary" id="vSave">Use this folder</button><button class="btn" id="vGuess">Find it for me</button></div><span class="v" id="vState"></span></div>
+  <p id="vRestart" style="font-size:11px;color:var(--text-muted);margin:14px 0 0;display:none"></p>
 </div></div>
 <div class="modal" id="noteModal"><div class="dlg">
   <div class="dh"><h2>New note</h2><button class="btn" id="closeNote">Close</button></div>
@@ -297,10 +306,11 @@ document.querySelectorAll('.tabs button').forEach(b => b.onclick = () => { docum
 function visBind(id, key, fmt){ const el=$('#'+id); el.value=VIS[key]; $('#'+id+'V').textContent=fmt(VIS[key]); el.oninput=e=>{ VIS[key]=+e.target.value; $('#'+id+'V').textContent=fmt(VIS[key]); store.set('visuals', VIS); if(key==='cap') mapEntity(G.centerTitle); else { kick(); draw(); } }; }
 function visInit(){ visBind('vLink','link',v=>v); visBind('vSpring','spring',v=>v); visBind('vRep','rep',v=>v); visBind('vColl','coll',v=>v); visBind('vNode','node',v=>v+'%'); visBind('vEdge','edge',v=>v+'%'); visBind('vCap','cap',v=>v); document.querySelectorAll('#lookSeg button').forEach(b=>{ b.classList.toggle('on', b.dataset.look===(VIS.look||'tinted')); b.onclick=()=>{ VIS.look=b.dataset.look; store.set('visuals', VIS); document.querySelectorAll('#lookSeg button').forEach(x=>x.classList.toggle('on',x===b)); draw(); }; }); }
 visInit(); $('#resetVisuals').onclick = () => { VIS = Object.assign({}, VIS_DEF); store.set('visuals', VIS); visInit(); kick(); };
-async function loadSettings(){ const c = await api('/api/config'); $('#vaultPath').textContent = c.vaultPath || ''; $('#clfName').textContent = c.classifier || 'typesafe/jev-1.13'; $('#keyState').textContent = c.hasKey ? 'checking…' : 'not set'; $('#orKey').value=''; if (c.hasKey) api('/api/keycheck').then(k => { $('#keyState').textContent = k.ok ? `valid ···${c.keyTail}${k.free?' (free tier)':''}` : `INVALID (${k.status||k.why}), paste it again`; $('#keyState').style.color = k.ok ? 'var(--good)' : 'var(--warn)'; }); const isLocal = !!c.llmBaseUrl; setExec(isLocal ? 'local' : 'api'); if (isLocal) { $('#llmBase').value = c.llmBaseUrl; $('#llmLocal').value = c.llm || ''; } else { const opt = [...$('#llmSel').options].find(o => o.value === c.llm); $('#llmSel').value = opt ? c.llm : 'custom'; $('#llmCustom').value = opt ? '' : (c.llm || ''); $('#customRow').style.display = opt ? 'none' : ''; } }
+async function loadSettings(){ const c = await api('/api/config'); const s = await api('/api/setup'); const vp = $('#vaultPath'); vp.value = s.vaultSet ? (c.vaultPath || '') : ''; vp.placeholder = s.vaultSet ? '' : 'not set — click Change'; $('#stateHome').textContent = s.home || ''; $('#clfName').textContent = c.classifier || 'typesafe/jev-1.13'; $('#keyState').textContent = c.hasKey ? 'checking…' : 'not set'; $('#orKey').value=''; if (c.hasKey) api('/api/keycheck').then(k => { $('#keyState').textContent = k.ok ? `valid ···${c.keyTail}${k.free?' (free tier)':''}` : `INVALID (${k.status||k.why}), paste it again`; $('#keyState').style.color = k.ok ? 'var(--good)' : 'var(--warn)'; }); const isLocal = !!c.llmBaseUrl; setExec(isLocal ? 'local' : 'api'); if (isLocal) { $('#llmBase').value = c.llmBaseUrl; $('#llmLocal').value = c.llm || ''; } else { const opt = [...$('#llmSel').options].find(o => o.value === c.llm); $('#llmSel').value = opt ? c.llm : 'custom'; $('#llmCustom').value = opt ? '' : (c.llm || ''); $('#customRow').style.display = opt ? 'none' : ''; } }
 function setExec(m){ document.querySelectorAll('#execSeg button').forEach(b=>b.classList.toggle('on', b.dataset.exec===m)); const local = m==='local'; $('#apiModelRow').style.display = local?'none':''; $('#customRow').style.display = (!local && $('#llmSel').value==='custom')?'':'none'; $('#localRow').style.display = local?'':'none'; $('#localModelRow').style.display = local?'':'none'; }
 document.querySelectorAll('#execSeg button').forEach(b => b.onclick = () => setExec(b.dataset.exec));
 $('#llmSel').onchange = e => { $('#customRow').style.display = e.target.value==='custom' ? '' : 'none'; };
+$('#changeVault').onclick = () => { const s = api('/api/setup'); showSetup(false); s.then(x => { if (x.vaultPath) $('#vPath').value = x.vaultPath; }); };
 $('#saveModels').onclick = async () => { const local = $('#execSeg button.on')?.dataset.exec === 'local'; const body = local ? { llm: $('#llmLocal').value.trim(), llmBaseUrl: $('#llmBase').value.trim() } : { llm: $('#llmSel').value==='custom' ? $('#llmCustom').value.trim() : $('#llmSel').value, llmBaseUrl: '' }; const key = $('#orKey').value.trim(); if (key) body.openrouterKey = key; if (!body.llm) return toast('Model id required'); const r = await api('/api/config', body); toast(r.ok ? 'Saved. Models ready.' : (r.error || 'Save failed')); if (r.ok) { $('#keyState').textContent = r.hasKey ? 'saved' : 'not set'; $('#orKey').value=''; } refresh(); };
 
 // ---------- floating panels: drag, collapse, snap to corners ----------
@@ -322,6 +332,62 @@ function mountAskPet(){ const c = $('#petAsk'); if (c && window.CelsusMascot) { 
 
 // ---------- navigation ----------
 document.querySelectorAll('.rail nav button').forEach(b => b.onclick = async () => { document.querySelectorAll('.rail nav button').forEach(x=>x.classList.toggle('on', x===b)); document.querySelectorAll('.screen').forEach(s=>s.classList.toggle('on', s.id===b.dataset.s)); if (b.dataset.s==='graph') resize(); if (b.dataset.s==='health') { await loadHealth(); renderHealth(); } });
+// ---------- choosing the folder ----------
+// Two ways in, one screen. A first run with no config lands here and cannot dismiss it, because the
+// old fallback pointed an unconfigured install at the user's entire home directory and it failed
+// silently. Settings opens the same dialog on demand for anyone who wants to move to another vault.
+let vaultProbe = null;
+function showSetup(firstRun){
+  $('#setupModal').classList.add('on');
+  // First run is not dismissable: there is nothing to go back to. Opened from Settings, it closes.
+  $('#closeSetup').style.display = firstRun ? 'none' : '';
+  $('#vRestart').style.display = 'none';
+  $('#vState').textContent = '';
+  $('#vProbeOut').textContent = '';
+  vaultProbe = null;
+  const inp = $('#vPath');
+  setTimeout(() => inp.focus(), 50);
+  inp.onkeydown = e => { if (e.key === 'Enter') doProbe(); e.stopPropagation(); };
+}
+$('#closeSetup').onclick = () => $('#setupModal').classList.remove('on');
+async function doProbe(){
+  const raw = $('#vPath').value.trim();
+  if (!raw) { $('#vState').textContent = 'Type or paste a folder path'; return; }
+  $('#vState').textContent = 'Checking…';
+  const r = await api('/api/vault/probe', { path: raw });
+  vaultProbe = r;
+  const out = $('#vProbeOut');
+  if (r.error) { out.innerHTML = ''; out.textContent = r.error; }
+  else if (!r.exists) { out.innerHTML = ''; out.textContent = 'No such folder: ' + esc(r.path); }
+  else if (!r.isDir) { out.innerHTML = ''; out.textContent = 'That is a file, not a folder. Point at the folder holding it.'; }
+  else if (!r.markdown) { out.innerHTML = ''; out.textContent = 'No markdown files in there. Point at the folder that holds your notes, not its parent.'; }
+  else {
+    out.innerHTML = `<span style="color:var(--good)">${r.markdown.toLocaleString()} markdown files</span>${r.obsidian ? ' · Obsidian vault' : ''}` + (r.folders && r.folders.length ? `<div class="mono" style="margin-top:4px;opacity:.7">${esc(r.folders.join('  '))}</div>` : '');
+  }
+  $('#vState').textContent = (r.exists && r.isDir && r.markdown) ? 'Looks right' : '';
+}
+$('#vProbe').onclick = doProbe;
+$('#vGuess').onclick = () => { const g = window.CELSUS_SUGGEST_VAULT || '~'; $('#vPath').value = g; doProbe(); };
+$('#vSave').onclick = async () => {
+  const raw = $('#vPath').value.trim();
+  if (!raw) return;
+  $('#vSave').disabled = true;
+  const r = await api('/api/vault', { path: raw });
+  $('#vSave').disabled = false;
+  if (r.error) { $('#vState').textContent = r.error; toast(r.error); return; }
+  // The new folder is saved, but VAULT_ROOT was resolved when the process started, so the graph on
+  // screen is still the old one. Say exactly that instead of closing the dialog and looking remapped.
+  const p = $('#vRestart');
+  p.style.display = 'block';
+  p.innerHTML = `Saved. Restart Celsus OS to map <span class="mono">${esc(r.vaultPath)}</span> &mdash; <span class="mono">celsus serve</span>, or just reload if it is already running under a supervisor.`;
+  toast('Folder saved. Restart to remap.');
+};
+async function offerSetupIfUnset(){
+  const s = await api('/api/setup');
+  if (!s.vaultSet) { showSetup(true); return s; }
+  return s;
+}
+
 async function refresh(){
   state = await api('/api/state?sort=' + (localStorage.getItem('celsus.sort') || 'unsure'));
   $('#mode').textContent = state.llmBaseUrl ? 'local model' : 'local';
@@ -686,7 +752,6 @@ async function askModel(question, opts){
   opts = opts||{}; if(!question) return; openPanel('#viewp'); petState('think');
   const focus = opts.focus || convo.focus || HOME();
   $('#viewBody').innerHTML = `<div class="eyebrow" style="margin-bottom:6px">${esc(question)}</div><span style="color:var(--text-muted)">Thinking with ${esc((state?.llm||'the configured model').split('/').pop())}${convo.focus?', about '+esc(convo.focus):''}. Reasoning models take 20 to 70 seconds.</span>`;
-  $('#askBtn').disabled = true;
   try {
     const r = await api('/api/ask', {question, focus, history: convo.history.slice(-6)});
     if (!r.view) { petState('error', 3000); $('#viewBody').innerHTML = `<span style="color:var(--warn)">The model did not return a view.</span> <span class="mono" style="font-size:11px">${esc((r.raw||r.error||'').slice(0,300))}</span>` + followUp(); bindFollowUp(); return; }
@@ -696,7 +761,7 @@ async function askModel(question, opts){
     petState('speak', 6000); renderView(r.view, r.model, r.latencyMs, question, {ask:true});
     const f = inGraph(convo.focus); if (f) { selected=f; inspect(f); draw(); }
   } catch(e) { petState('error', 3000); $('#viewBody').innerHTML = `<span style="color:var(--warn)">Ask failed: ${esc(String(e))}</span>` + followUp(); bindFollowUp(); }
-  finally { $('#askBtn').disabled = false; }
+  finally { /* nothing to re-enable: the Ask button is gone, Enter is always live */ }
 }
 function inspectVault(){ const I=$('#insp .pb'); openPanel('#insp'); I.innerHTML = `<div><div class="eyebrow">overview</div><h2>Whole vault</h2></div><dl class="kv"><dt>notes</dt><dd>${state?state.notes.toLocaleString():''}</dd><dt>resolved</dt><dd>${state?state.resolved.toLocaleString():''}</dd><dt>to decide</dt><dd>${state?state.deckSize:''}</dd><dt>missing notes</dt><dd>${state?state.ghosts:''}</dd></dl><p style="color:var(--text-muted);margin:0">The ${G.nodes.length} most linked entities and the edges between them. Click one and use Map around this to dive in.</p>`; }
 function bindRegen(entity){ const b=$('#regen'); if(!b) return; b.onclick=async()=>{ b.disabled=true; petState('think'); $('#viewBody').innerHTML=`<span style="color:var(--text-muted)">Writing with ${esc(state?.llm||'')}. Reasoning models take 20 to 70 seconds.</span>`; try { const r=await api('/api/narrate',{entity}); if(r.view){ petState('speak',6000); renderView(r.view,r.model,r.latencyMs,null,{entity}); } else { petState('error',3000); $('#viewBody').innerHTML=`<span style="color:var(--warn)">No view: ${esc((r.error||r.raw||'').slice(0,200))}</span>`; } } catch(e){ petState('error',3000); $('#viewBody').textContent='Failed: '+e; } }; }
@@ -736,8 +801,10 @@ const sugItems = () => [...$('#sugg').querySelectorAll('div[data-t]')];
 function sugMove(d){ const it=sugItems(); if(!it.length) return; sugIdx=(sugIdx+d+it.length)%it.length; it.forEach((x,i)=>x.classList.toggle('sel',i===sugIdx)); it[sugIdx].scrollIntoView({block:'nearest'}); }
 async function isEntity(v){ if (v.toLowerCase()==='whole vault') return 'Whole vault'; if (v.split(' ').length>6) return null; const hits = await api('/api/search?q='+encodeURIComponent(v)); const exact = hits.find(h => h.title.toLowerCase()===v.toLowerCase()); return exact ? exact.title : null; }
 function askAbout(t){ if (t==='Whole vault') { setFocus('Whole vault'); askModel('Give an overview of this vault: the biggest companies, people and efforts, what is pending, what is missing, and the single most useful thing to do next.', {focus:'Whole vault'}); } else { setFocus(t); askModel(`Tell me about ${t}: what it is connected to, what is pending on it, and the single most useful thing to do next.`, {focus:t}); } }
-$('#goBtn').onclick = async () => { const v=$('#q').value.trim(); if(!v) return; const t = await isEntity(v); if (t) { $('#sugg').style.display='none'; sugIdx=-1; if (pickMode) chooseSubject(t); else mapEntity(t); } else { toast('Map needs a note title. Pick one from the list, or press Ask.'); $('#q').dispatchEvent(new Event('input')); } };
-$('#askBtn').onclick = async () => { const v=$('#q').value.trim(); if(!v) return; $('#sugg').style.display='none'; sugIdx=-1; const t = await isEntity(v); if (t) askAbout(t); else askModel(v); };
+// Map and Ask used to sit next to the search bar as buttons. Both are gone: Map was a strict subset
+// of Enter, and it toasted "Map needs a note title" whenever the text was not already an exact entity,
+// which is most of the time. Ask is what Enter already does, or Shift Enter for a name. The keydown
+// handler below is now the only way in, which is why it grew a Shift branch.
 $('#q').addEventListener('keydown', async e => { const S=$('#sugg'); const open = S.style.display==='block';
   if (e.key==='ArrowDown' && open) { e.preventDefault(); sugMove(1); return; } if (e.key==='ArrowUp' && open) { e.preventDefault(); sugMove(-1); return; } if (e.key==='Escape') { S.style.display='none'; sugIdx=-1; if (pickMode) { pickMode=false; syncSubject(); $('#q').placeholder='A name to map, or a question to ask Celsus'; $('#qhint').textContent=''; } return; }
   if (e.key!=='Enter') return; e.preventDefault(); if (open && sugIdx>=0) { sugItems()[sugIdx].click(); return; } S.style.display='none'; sugIdx=-1; const v=$('#q').value.trim(); if(!v) return; const t = await isEntity(v); if (t) { if (pickMode) chooseSubject(t); else if (e.shiftKey) askAbout(t); else mapEntity(t); } else askModel(v); });
@@ -754,6 +821,10 @@ document.addEventListener('click', e => { if(!e.target.closest('.ask')) { $('#su
   resize();
   try { await refresh(); } catch (e) { toast('Server state failed: ' + e); }
   try { await loadLists(); } catch (e) {}
+  // On a first run with nothing configured, the folder screen comes up before anything else. The
+  // old fallback scanned the whole home directory and said nothing, so this is the difference
+  // between a new teammate choosing their vault and quietly mapping their Documents folder.
+  try { await offerSetupIfUnset(); } catch (e) { console.warn('setup check failed', e); }
   $('#q').value = ''; syncSubject(); mapEntity(HOME());
 })();
 window.addEventListener('error', e => { const t=$('#toast'); if (t) { t.textContent = 'UI error: ' + e.message; t.classList.add('on'); } });
