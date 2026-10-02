@@ -596,7 +596,12 @@ function draw(){
       if (v.fixed){ ctx.fillStyle=css('--brass'); ctx.beginPath(); ctx.arc(x+r*0.75,y-r*0.75,3*dpr,0,Math.PI*2); ctx.fill(); }
       if (v.halo){ ctx.beginPath(); ctx.arc(x+r*0.78,y-r*0.78,4.2*dpr,0,Math.PI*2); ctx.fillStyle=css('--brass'); ctx.fill(); ctx.strokeStyle=css('--surface'); ctx.lineWidth=1.5*dpr; ctx.stroke(); }
     }
-    if (showLabels || v.halo || G.labels.has(v.id) || nbSet.has(v.id)){ const fs=Math.max(10,12*Math.min(1.2,cam.k))*dpr; label(v.title.length>26?v.title.slice(0,25)+'…':v.title, x, y+r+14*dpr, fs, css(v.ghost?'--text-muted':'--text'), v.id===G.center||v===selected?600:400); if(v.inbound){ ctx.fillStyle=css('--text-muted'); ctx.font=`${9.5*dpr}px "IBM Plex Mono", monospace`; ctx.textAlign='center'; ctx.fillText(v.inbound.toLocaleString(), x, y+r+27*dpr); } }
+    if (showLabels || v.halo || G.labels.has(v.id) || nbSet.has(v.id)){ const fs=Math.max(10,12*Math.min(1.2,cam.k))*dpr; const key = v.id===G.center || v===selected || v===hover;
+      // The node you mapped around is the one you most need to read, so it gets a longer budget than
+      // the ring of nodes around it. Truncating it to the same width as a leaf meant the subject of
+      // the whole view was the hardest label on screen.
+      const cap = key ? 40 : 26, t = v.title.length>cap ? v.title.slice(0,cap-1)+'…' : v.title;
+      label(t, x, y+r+14*dpr, fs, css(v.ghost?'--text-muted':'--text'), key?600:400); if(v.inbound){ ctx.fillStyle=css('--text-muted'); ctx.font=`${9.5*dpr}px "IBM Plex Mono", monospace`; ctx.textAlign='center'; ctx.fillText(v.inbound.toLocaleString(), x, y+r+27*dpr); } }
   }
   ctx.globalAlpha=1;
 }
