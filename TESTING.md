@@ -27,7 +27,7 @@ Config is written to `~/.celsus-os/config.json`, outside the vault and outside t
 ## 4. First pass over the vault
 
 ```
-node cli.ts run         # normalize (about 90 s on 2,900 notes), owner edges, missed links, duplicates. Under 10 cents.
+node cli.ts run         # normalize (about 90 s on 2,900 notes), owner edges, missed links, duplicates. Measured $0.114 on a 3,205 note vault, of which suggest-owners is 86%.
 ```
 
 Outputs land in `<vault>/Efforts/Active/Celsus OS/runs/<date>/`. `report.md` is the summary.

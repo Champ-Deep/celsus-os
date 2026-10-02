@@ -45,7 +45,9 @@ You need one OpenRouter key, Node 22.18 or newer (the app is TypeScript and Node
 
 Prefer a clone? `git clone https://github.com/Champ-Deep/celsus-os.git && cd celsus-os && node cli.ts setup`. Every `celsus` command is `node cli.ts` in the clone. `celsus update` pulls the latest version.
 
-That one key pays for two things: Jev, the classifier that judges every call and reports how sure it is (about two cents for a whole vault pass), and the writer that drafts notes. Jev is reached through OpenRouter by default; a TypeSafe key works too if you would rather call it there. A free hosted writer is the default, and if you have a local model running, setup finds it and offers to use it instead.
+That one key pays for two things: Jev, the classifier that judges every call and reports how sure it is, and the writer that drafts notes. Jev is reached through OpenRouter by default; a TypeSafe key works too if you would rather call it there. A free hosted writer is the default, and if you have a local model running, setup finds it and offers to use it instead.
+
+**What a pass costs, measured rather than guessed.** A full `celsus run` over a 3,205 note vault cost **$0.114**, itemised from that run's own output: `normalize-entities` $0.011 (400 classifier calls), `suggest-owners` $0.098, `suggest-links` $0.004, and `find-duplicates` nothing, because it runs locally. That works out to about $0.00004 a note, so the price scales with the vault rather than surprising you: roughly $0.04 for a 1,000 note vault, $0.11 for 3,000, $0.35 for 10,000. Note which pass dominates: `suggest-owners` is 86% of the spend. If you want a cheaper pass, that is the one to make optional.
 
 ## The loop
 
@@ -97,7 +99,7 @@ Each person installs, runs `celsus setup` against their own vault with their own
 
 ## Status
 
-Version 0.2.0. The classifier is `typesafe/jev-1.13`, reached through OpenRouter's Decisions API; calling TypeSafe directly with your own key is optional and changes only where that call goes. The writing model is swappable: any OpenRouter model, or a local Ollama or LM Studio endpoint, in which case narration runs on your machine. This project has had no independent security review and no independent accuracy review of the classifier. The cost figures quoted above are the repo's own testing notes, not a billing guarantee. The repository is not published yet, so the install URL at the top of this file is the intended home rather than a working link.
+Version 0.2.0. The classifier is `typesafe/jev-1.13`, reached through OpenRouter's Decisions API; calling TypeSafe directly with your own key is optional and changes only where that call goes. The writing model is swappable: any OpenRouter model, or a local Ollama or LM Studio endpoint, in which case narration runs on your machine. This project has had no independent security review and no independent accuracy review of the classifier. The cost figure above was measured from one real run on one vault and is not a billing guarantee; it will move with the model, the pricing, and how many notes actually need judging.
 
 ## Contributing and the next front end
 

@@ -219,7 +219,7 @@ One OpenRouter key, and small amounts on it.
 
 | Item | Cost |
 |---|---|
-| Classifier (`typesafe/jev-1.13` via OpenRouter) | The README says about two cents for a whole vault pass. `TESTING.md` budgets the whole `celsus run` at under ten cents. Both are the repo's own figures from testing, not a metered guarantee. |
+| Classifier (`typesafe/jev-1.13` via OpenRouter) | Measured, not estimated: a full `celsus run` over a 3,205 note vault cost **$0.114**. That is `normalize-entities` $0.011 over 400 classifier calls, `suggest-owners` $0.098, `suggest-links` $0.004, and `find-duplicates` $0 because it runs locally. About $0.00004 a note, so a 1,000 note vault is roughly $0.04 and a 10,000 note one roughly $0.35. One vault, one run, not a metered guarantee. |
 | Writer, free default | Free while the model's tag is live. Free model ids are listed in the previous section. |
 | Writer, if you pick a paid one | Priced by OpenRouter per your account. `docs/REFERENCE.md` records USD 0.0003 for one narration with `deepseek/deepseek-v4-flash`. |
 | Writer, local | Zero. Nothing is billed. |

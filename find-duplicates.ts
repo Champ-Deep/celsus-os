@@ -9,6 +9,7 @@ import type { Note } from './vault.ts';
 import { kindOfPath } from './kinds.ts';
 import { buildGlossary, rank, resolveExact } from './glossary.ts';
 import { editRatio } from './match.ts';
+import { runCost, costBlock } from './runcost.ts';
 
 const OUT = todayRunDir();
 type Verdict = 'delete_safe' | 'merge_then_delete' | 'different_thing' | 'rename' | 'alias_conflict';
@@ -74,6 +75,18 @@ function main() {
     L.push('');
   }
   fs.writeFileSync(path.join(OUT, 'duplicates.md'), L.join('\n').replace(/[\u2014\u2013]/g, '-'));
-  console.log(JSON.stringify({ groups: groups.size, duplicates: rows.length, counts: rows.reduce((m, r) => (m[r.verdict] = (m[r.verdict] || 0) + 1, m), {} as Record<string, number>) }));
+  // This is the last pass of a run, so it is the only one that can see what all four spent. The report
+  // was written by the first pass and can only ever quote the first pass, which understated a real
+  // 3,205 note run by a factor of ten. Rewrite the cost section here with the measured total.
+  const cost = runCost(OUT, notes.length);
+  const report = path.join(OUT, 'report.md');
+  if (fs.existsSync(report)) {
+    const prev = fs.readFileSync(report, 'utf8');
+    // Replace any earlier cost block rather than appending a second one, so repeated runs do not
+    // stack totals on top of each other.
+    const cut = prev.split('\n## What this run cost')[0];
+    fs.writeFileSync(report, (cut + costBlock(cost, todayStamp())).replace(/[\u2014\u2013]/g, '-') + '\n');
+  }
+  console.log(JSON.stringify({ groups: groups.size, duplicates: rows.length, counts: rows.reduce((m, r) => (m[r.verdict] = (m[r.verdict] || 0) + 1, m), {} as Record<string, number>), costUSD: +cost.total.toFixed(4), costByPass: Object.fromEntries(cost.byPass.map(r => [r.pass, +r.cost.toFixed(4)])) }));
 }
 main();
