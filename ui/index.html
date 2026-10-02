@@ -180,7 +180,7 @@ canvas.map{display:block;width:100%;height:100%;cursor:grab}
   </div>
   <div style="min-height:0;display:grid">
     <section class="screen on" id="graph">
-      <div class="ask"><span class="chip subj" id="subj" title="The subject Celsus is talking about. Click to change it.">whole vault</span><div class="qwrap"><input id="q" placeholder="A name to map, or a question to ask Celsus" autocomplete="off"><span class="hint" id="qhint"></span></div></div>
+      <div class="ask"><span class="chip subj" id="subj" title="The subject Celsus is talking about. Click to change it.">whole vault</span><div class="qwrap"><input id="q" placeholder="A name to map, or a question to ask Celsus" autocomplete="off"><span class="hint" id="qhint"></span></div>
         <div class="help">?<div class="tip"><dl><dt>Enter</dt><dd>maps a known name, otherwise asks the model</dd><dt>Shift Enter</dt><dd>ask about a name instead of mapping it</dd><dt>↑ ↓</dt><dd>move through suggestions, Enter picks</dd><dt>click</dt><dd>inspect a node</dd><dt>drag</dt><dd>move a node, neighbours follow</dd><dt>dbl click</dt><dd>pin or unpin</dd><dt>wheel</dt><dd>zoom around the cursor</dd><dt>/</dt><dd>focus this bar</dd><dt>subject chip</dt><dd>what follow ups are about; click to change</dd><dt>1 2 3 4</dt><dd>answer a card on Decide</dd></dl></div></div>
         <div class="sugg" id="sugg"></div></div>
       <div class="toolbar"><span class="chip on" data-h="1">1 hop</span><span class="chip" data-h="2">2 hops</span><span class="sep"></span><span class="chip on" data-k="person">People</span><span class="chip on" data-k="company">Companies</span><span class="chip on" data-k="client">Clients</span><span class="chip on" data-k="effort">Efforts</span><span class="chip on" data-k="product">Products</span><span class="chip" data-k="meeting">Meetings</span><span class="chip" data-k="doc">Docs</span><span class="sep"></span><span class="chip on" id="chipSug">Suggested edges</span><span class="chip" id="chipLabels">All labels</span></div>
@@ -306,7 +306,7 @@ document.querySelectorAll('.tabs button').forEach(b => b.onclick = () => { docum
 function visBind(id, key, fmt){ const el=$('#'+id); el.value=VIS[key]; $('#'+id+'V').textContent=fmt(VIS[key]); el.oninput=e=>{ VIS[key]=+e.target.value; $('#'+id+'V').textContent=fmt(VIS[key]); store.set('visuals', VIS); if(key==='cap') mapEntity(G.centerTitle); else { kick(); draw(); } }; }
 function visInit(){ visBind('vLink','link',v=>v); visBind('vSpring','spring',v=>v); visBind('vRep','rep',v=>v); visBind('vColl','coll',v=>v); visBind('vNode','node',v=>v+'%'); visBind('vEdge','edge',v=>v+'%'); visBind('vCap','cap',v=>v); document.querySelectorAll('#lookSeg button').forEach(b=>{ b.classList.toggle('on', b.dataset.look===(VIS.look||'tinted')); b.onclick=()=>{ VIS.look=b.dataset.look; store.set('visuals', VIS); document.querySelectorAll('#lookSeg button').forEach(x=>x.classList.toggle('on',x===b)); draw(); }; }); }
 visInit(); $('#resetVisuals').onclick = () => { VIS = Object.assign({}, VIS_DEF); store.set('visuals', VIS); visInit(); kick(); };
-async function loadSettings(){ const c = await api('/api/config'); const s = await api('/api/setup'); const vp = $('#vaultPath'); vp.value = s.vaultSet ? (c.vaultPath || '') : ''; vp.placeholder = s.vaultSet ? '' : 'not set — click Change'; $('#stateHome').textContent = s.home || ''; $('#clfName').textContent = c.classifier || 'typesafe/jev-1.13'; $('#keyState').textContent = c.hasKey ? 'checking…' : 'not set'; $('#orKey').value=''; if (c.hasKey) api('/api/keycheck').then(k => { $('#keyState').textContent = k.ok ? `valid ···${c.keyTail}${k.free?' (free tier)':''}` : `INVALID (${k.status||k.why}), paste it again`; $('#keyState').style.color = k.ok ? 'var(--good)' : 'var(--warn)'; }); const isLocal = !!c.llmBaseUrl; setExec(isLocal ? 'local' : 'api'); if (isLocal) { $('#llmBase').value = c.llmBaseUrl; $('#llmLocal').value = c.llm || ''; } else { const opt = [...$('#llmSel').options].find(o => o.value === c.llm); $('#llmSel').value = opt ? c.llm : 'custom'; $('#llmCustom').value = opt ? '' : (c.llm || ''); $('#customRow').style.display = opt ? 'none' : ''; } }
+async function loadSettings(){ const c = await api('/api/config'); const s = await api('/api/setup'); const vp = $('#vaultPath'); vp.value = s.vaultSet ? (c.vaultPath || '') : ''; vp.placeholder = s.vaultSet ? '' : 'not set, click Change'; $('#stateHome').textContent = s.home || ''; $('#clfName').textContent = c.classifier || 'typesafe/jev-1.13'; $('#keyState').textContent = c.hasKey ? 'checking…' : 'not set'; $('#orKey').value=''; if (c.hasKey) api('/api/keycheck').then(k => { $('#keyState').textContent = k.ok ? `valid ···${c.keyTail}${k.free?' (free tier)':''}` : `INVALID (${k.status||k.why}), paste it again`; $('#keyState').style.color = k.ok ? 'var(--good)' : 'var(--warn)'; }); const isLocal = !!c.llmBaseUrl; setExec(isLocal ? 'local' : 'api'); if (isLocal) { $('#llmBase').value = c.llmBaseUrl; $('#llmLocal').value = c.llm || ''; } else { const opt = [...$('#llmSel').options].find(o => o.value === c.llm); $('#llmSel').value = opt ? c.llm : 'custom'; $('#llmCustom').value = opt ? '' : (c.llm || ''); $('#customRow').style.display = opt ? 'none' : ''; } }
 function setExec(m){ document.querySelectorAll('#execSeg button').forEach(b=>b.classList.toggle('on', b.dataset.exec===m)); const local = m==='local'; $('#apiModelRow').style.display = local?'none':''; $('#customRow').style.display = (!local && $('#llmSel').value==='custom')?'':'none'; $('#localRow').style.display = local?'':'none'; $('#localModelRow').style.display = local?'':'none'; }
 document.querySelectorAll('#execSeg button').forEach(b => b.onclick = () => setExec(b.dataset.exec));
 $('#llmSel').onchange = e => { $('#customRow').style.display = e.target.value==='custom' ? '' : 'none'; };
@@ -520,11 +520,16 @@ function renderHealth(){
   ].join('');
   const bar = (v, max) => `<span class="meter"><i style="transform:scaleX(${max ? Math.max(0.02, Math.min(1, v / max)) : 0})"></i></span>`;
   const maxReach = Math.max(...h.folders.filter(x => !x.root).map(x => x.reach), 1);
-  const folderRow = f => `<div class="row" style="grid-template-columns:1fr 90px 70px 110px">
+  // The reach cell used to be a 90px column holding both the meter and its number, with
+  // white-space:nowrap on .row .c. The bar and the figure had nowhere to go, so they printed on top
+  // of each other: "35.113.9 out". The bar gets its own column, the numbers get room, and the
+  // figures are right aligned so the column of numbers reads as a column.
+  const folderRow = f => `<div class="row" style="grid-template-columns:1fr 130px 46px 66px 46px">
       <span><b>${esc(f.folder)}</b> <span class="sp">${f.notes} ${plural(f.notes,'note')}, ${(f.words/1000).toFixed(0)}k words</span></span>
-      <span class="c">${bar(f.reach, maxReach)} ${f.reach}</span>
-      <span class="c">${f.density} out</span>
-      <span class="c">${f.inbound} in</span></div>`;
+      ${bar(f.reach, maxReach)}
+      <span class="c" style="text-align:right">${f.reach}</span>
+      <span class="c" style="text-align:right">${f.density} out</span>
+      <span class="c" style="text-align:right">${f.inbound} in</span></div>`;
   const list = (el, arr) => { const n = $(el); n.innerHTML = arr.length ? arr.map(folderRow).join('') : '<div class="empty">Nothing measured yet.</div>'; };
   list('#healthBest', h.best); list('#healthWorst', h.worst); list('#healthFolders', h.folders);
   $('#healthKinds').innerHTML = h.byKind.map(k => `<div class="row" style="grid-template-columns:120px 1fr 60px"><span class="tag ${esc(k.kind)}">${esc(k.kind)}</span>${bar(k.count, Math.max(...h.byKind.map(x=>x.count),1))}<span class="c">${k.count}</span></div>`).join('');
@@ -599,13 +604,16 @@ function layout(){ const n=G.nodes.length; G.nodes.forEach((v,i)=>{ if(v.x==null
 // equilibrium. That test therefore has no power to detect the difference and is not quoted as
 // evidence for it. What is true is that the step count no longer varies with the display.
 const PHYS_DT = 1/60;
-// Springs were the one force left unclamped. Repulsion is capped, so dragging a node quickly could
-// push a neighbour through its spring hard enough to make the whole graph oscillate, which is what
-// reads as jitter. Cap the speed so a flick settles instead of ringing.
-const MAX_V = 6;
-// While a node is held, its neighbours are damped harder. Otherwise they overshoot the cursor and
-// spring back, and the cluster wobbles around your hand the whole time you are moving it.
-const DAMP_HELD = 0.72, DAMP_FREE = 0.82;
+// Bounce. The previous damping (0.82 free, 0.72 held) was tuned to kill jitter, and it succeeded so
+// well the graph felt dead: it slid to a stop with no life in it. These are looser, and a released
+// node now keeps a fraction of its velocity instead of being braked to nothing. Two guards keep the
+// looseness from bringing jitter back: MAX_V still caps speed, and the energy gate still stops the
+// loop, so the graph cannot ring forever. The settle target is 90ms to about 250ms rather than 90ms.
+const MAX_V = 7;
+// How much of a released node's velocity survives the let-go, as a one-off impulse. 0 means it stops
+// dead where you let it, which is what felt lifeless.
+const RELEASE_KEEP = 0.40;
+const DAMP_HELD = 0.78, DAMP_FREE = 0.86;
 function step(){
   const ns = G.nodes;
   for (let i=0;i<ns.length;i++){ const a=ns[i]; for(let j=i+1;j<ns.length;j++){ const b=ns[j]; let dx=b.x-a.x, dy=b.y-a.y; let d2=dx*dx+dy*dy+0.01; const min=(radius(a)+radius(b))*VIS.coll; const f = Math.min(9, VIS.rep/d2) + (d2<min*min ? (min-Math.sqrt(d2))*0.2 : 0); const d=Math.sqrt(d2); dx/=d; dy/=d; if(!a.fixed){a.vx-=dx*f; a.vy-=dy*f;} if(!b.fixed){b.vx+=dx*f; b.vy+=dy*f;} } }
@@ -685,7 +693,12 @@ function draw(){
 function hit(sx,sy){ const [wx,wy]=toWorld(sx,sy); let best=null; for(const v of G.nodes){ const d=Math.hypot(v.x-wx,v.y-wy); if(d<radius(v)+4 && (!best||d<best.d)) best={v,d}; } return best?.v||null; }
 cv.addEventListener('mousedown', e => { const r=cv.getBoundingClientRect(); const v=hit(e.clientX-r.left,e.clientY-r.top); if(v){ drag={v,wasFixed:v.fixed,tx:v.x,ty:v.y}; v.fixed=true; cv.style.cursor='grabbing'; /* capture so a fast drag that leaves the canvas keeps holding the node instead of dropping it mid gesture */ try{ cv.setPointerCapture(e.pointerId); }catch{} } else panning={x:e.clientX,y:e.clientY,cx:cam.x,cy:cam.y}; });
 window.addEventListener('mousemove', e => { const r=cv.getBoundingClientRect(); if(drag){ const [wx,wy]=toWorld(e.clientX-r.left,e.clientY-r.top); drag.tx=wx; drag.ty=wy; kick(); } else if(panning){ cam.x=panning.cx+(e.clientX-panning.x)/cam.k; cam.y=panning.cy+(e.clientY-panning.y)/cam.k; draw(); } else if (e.target===cv) { const v=hit(e.clientX-r.left,e.clientY-r.top); if(v!==hover){hover=v; cv.style.cursor=v?'pointer':'grab'; draw();} } });
-window.addEventListener('mouseup', () => { if(drag){ drag.v.fixed=drag.wasFixed; drag=null; kick(); } panning=null; cv.style.cursor='grab'; });
+window.addEventListener('mouseup', () => {
+// On release the held node keeps most of the velocity it had while you were moving it, so letting go
+// mid-drag throws the node and it coasts into place instead of stopping dead. This is the throw, and
+// it is a one-off: after this the normal damping takes over, so it still settles.
+if (drag){ drag.v.fixed=drag.wasFixed; if(!drag.v.fixed){ drag.v.vx*=RELEASE_KEEP; drag.v.vy*=RELEASE_KEEP; } drag=null; kick(); }
+panning=null; cv.style.cursor='grab'; });
 cv.addEventListener('click', e => { const r=cv.getBoundingClientRect(); const v=hit(e.clientX-r.left,e.clientY-r.top); selected=v; inspect(v); draw(); if (v) showNodeView(v); });
 async function showNodeView(v){
   openPanel('#viewp'); setFocus(v.title);

@@ -91,6 +91,14 @@ jobs:
         # is not TypeScript and no test loads the page.
         run: node check-ui.ts
 
+      - name: The interface has the structure the layout depends on
+        # The script parsing above is not enough, and there is a case that proves it. Removing two
+        # buttons left one closing </div> too many, so #graph closed early and the toolbar and canvas
+        # fell out of it. The HTML stayed well formed, the script stayed valid, typecheck stayed
+        # clean, and every screen was pushed down the page behind a 241px dead gap. This walks the
+        # parse tree and asserts the parentage, which is the thing that actually broke.
+        run: node check-ui-structure.ts
+
       - name: Import the library modules
         # Parsing proves each file is valid on its own. Importing proves the module graph resolves,
         # which is what actually caught a renamed export during development. Only modules with no
