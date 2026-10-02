@@ -84,13 +84,20 @@ jobs:
             process.exit(bad ? 1 : 0);
           '
 
+      - name: The interface script parses
+        # The whole UI is one inline script in one HTML file, so a stray brace makes the entire
+        # interface a blank page. There is no build step to notice, and this caught a real one: a
+        # physics rewrite that closed a brace twice, which typecheck could not see because the file
+        # is not TypeScript and no test loads the page.
+        run: node check-ui.ts
+
       - name: Import the library modules
         # Parsing proves each file is valid on its own. Importing proves the module graph resolves,
         # which is what actually caught a renamed export during development. Only modules with no
         # side effects are imported: the entry scripts (cli, serve, doctor, setup and the four run
         # passes) execute on import and are covered by the smoke test below instead.
         run: |
-          for m in config vault glossary match llm jev policy metrics archive notes; do
+          for m in config vault glossary match llm jev policy metrics archive notes runcost; do
             node -e "import('./$m.ts').then(() => console.log('  ok   $m')).catch(e => { console.error('  FAIL $m: ' + e.message.split('\n')[0]); process.exit(1); })" || exit 1
           done
 

@@ -517,15 +517,45 @@ window.addEventListener('resize', resize);
 const radius = n => n.ghost ? 11 : Math.max(10, Math.min(34, 8 + 4.5*Math.log2(1 + n.inbound)));
 const labelSet = () => { const top = [...G.nodes].sort((a,b)=>b.inbound-a.inbound).slice(0,10).map(n=>n.id); return new Set([G.center, ...top]); };
 function layout(){ const n=G.nodes.length; G.nodes.forEach((v,i)=>{ if(v.x==null){ const a=i/n*Math.PI*2, r = v.id===G.center?0:180+Math.random()*120; v.x=Math.cos(a)*r; v.y=Math.sin(a)*r; v.vx=0; v.vy=0; } }); G.byId = Object.fromEntries(G.nodes.map(v=>[v.id,v])); }
+// Physics used to run once per drawn frame, which quietly made the graph's behaviour depend on the
+// monitor. At 120Hz it integrated twice as fast as at 60Hz: same drag, different graph, and a fast
+// one looked like static. The sim now runs on a fixed 60Hz step and the renderer draws whatever it
+// likes, so the motion is identical on every display.
+const PHYS_DT = 1/60;
+// Springs were the one force left unclamped. Repulsion is capped, so dragging a node quickly could
+// push a neighbour through its spring hard enough to make the whole graph oscillate, which is what
+// reads as jitter. Cap the speed so a flick settles instead of ringing.
+const MAX_V = 6;
+// While a node is held, its neighbours are damped harder. Otherwise they overshoot the cursor and
+// spring back, and the cluster wobbles around your hand the whole time you are moving it.
+const DAMP_HELD = 0.72, DAMP_FREE = 0.82;
 function step(){
   const ns = G.nodes;
   for (let i=0;i<ns.length;i++){ const a=ns[i]; for(let j=i+1;j<ns.length;j++){ const b=ns[j]; let dx=b.x-a.x, dy=b.y-a.y; let d2=dx*dx+dy*dy+0.01; const min=(radius(a)+radius(b))*VIS.coll; const f = Math.min(9, VIS.rep/d2) + (d2<min*min ? (min-Math.sqrt(d2))*0.2 : 0); const d=Math.sqrt(d2); dx/=d; dy/=d; if(!a.fixed){a.vx-=dx*f; a.vy-=dy*f;} if(!b.fixed){b.vx+=dx*f; b.vy+=dy*f;} } }
-  for (const e of G.edges){ const a=G.byId[e.a], b=G.byId[e.b]; if(!a||!b) continue; const rest=(radius(a)+radius(b))*2.4+VIS.link; let dx=b.x-a.x, dy=b.y-a.y; const d=Math.sqrt(dx*dx+dy*dy)+0.01; const f=(d-rest)*(VIS.spring/100)*(e.type==='wikilink'?1:0.5); dx/=d; dy/=d; if(!a.fixed){a.vx+=dx*f; a.vy+=dy*f;} if(!b.fixed){b.vx-=dx*f; b.vy-=dy*f;} }
-  let energy=0; for (const v of ns){ if(v.fixed){v.vx=0;v.vy=0;continue;} v.vx += -v.x*0.003; v.vy += -v.y*0.003; v.vx*=0.82; v.vy*=0.82; v.x+=v.vx; v.y+=v.vy; energy+=v.vx*v.vx+v.vy*v.vy; }
+  for (const e of G.edges){ const a=G.byId[e.a], b=G.byId[e.b]; if(!a||!b) continue; const rest=(radius(a)+radius(b))*2.4+VIS.link; let dx=b.x-a.x, dy=b.y-a.y; const d=Math.sqrt(dx*dx+dy*dy)+0.01; let f=(d-rest)*(VIS.spring/100)*(e.type==='wikilink'?1:0.5); f=Math.max(-4,Math.min(4,f)); dx/=d; dy/=d; if(!a.fixed){a.vx+=dx*f; a.vy+=dy*f;} if(!b.fixed){b.vx-=dx*f; b.vy-=dy*f;} }
+  const damp = drag ? DAMP_HELD : DAMP_FREE;
+  let energy=0; for (const v of ns){ if(v.fixed){v.vx=0;v.vy=0;continue;} v.vx += -v.x*0.003; v.vy += -v.y*0.003; v.vx*=damp; v.vy*=damp; const sp=Math.hypot(v.vx,v.vy); if(sp>MAX_V){ v.vx=v.vx/sp*MAX_V; v.vy=v.vy/sp*MAX_V; } v.x+=v.vx; v.y+=v.vy; energy+=v.vx*v.vx+v.vy*v.vy; }
+  // The held node eases toward the cursor instead of being teleported onto it. Teleporting is what
+  // made the node feel like it was being yanked rather than held, because its neighbours kept their
+  // momentum and kept moving around a point that had already jumped.
+  if (drag && drag.tx != null){ drag.v.x += (drag.tx-drag.v.x)*0.5; drag.v.y += (drag.ty-drag.v.y)*0.5; }
   return energy;
 }
-function tick(){ const e = step(); draw(); if (e > 0.02 || drag) raf = requestAnimationFrame(tick); else { raf=null; if (G.needFit){ G.needFit=false; fitView(); } } }
-function kick(){ if(!raf) raf=requestAnimationFrame(tick); }
+let physAcc = 0, lastT = 0;
+function tick(now){
+  raf = requestAnimationFrame(tick);
+  if(!lastT) lastT = now;
+  // A tab that was in the background returns an enormous elapsed time. Clamp it, or the graph
+  // receives hundreds of steps at once and explodes on the first frame after you come back to it.
+  const elapsed = Math.min(0.1, (now-lastT)/1000); lastT = now;
+  physAcc += elapsed;
+  let e = 0, steps = 0;
+  while(physAcc >= PHYS_DT && steps < 8){ e = step(); physAcc -= PHYS_DT; steps++; }
+  if(steps >= 8) physAcc = 0;   // too far behind to catch up; drop the debt instead of stuttering
+  draw();
+  if (e > 0.02 || drag) { /* keep the loop alive */ } else { raf=null; lastT=0; physAcc=0; if (G.needFit){ G.needFit=false; fitView(); } }
+}
+function kick(){ if(!raf){ physAcc=0; lastT=0; raf=requestAnimationFrame(tick); } }
 function fitView(){ if(!G.nodes.length) return; let minx=1e9,maxx=-1e9,miny=1e9,maxy=-1e9; for(const v of G.nodes){ minx=Math.min(minx,v.x); maxx=Math.max(maxx,v.x); miny=Math.min(miny,v.y); maxy=Math.max(maxy,v.y);} const w=(maxx-minx)+200, h=(maxy-miny)+200; const r=cv.getBoundingClientRect(); const k=Math.max(0.3,Math.min(1.6,Math.min(r.width/w,r.height/h))); cam={x:-(minx+maxx)/2,y:-(miny+maxy)/2,k}; $('#zoom').value=Math.round(k*100); $('#zoomv').textContent=Math.round(k*100)+'%'; draw(); }
 function toScreen(x,y){ return [W/2 + (x+cam.x)*cam.k*devicePixelRatio, H/2 + (y+cam.y)*cam.k*devicePixelRatio]; }
 function toWorld(sx,sy){ return [(sx*devicePixelRatio - W/2)/(cam.k*devicePixelRatio) - cam.x, (sy*devicePixelRatio - H/2)/(cam.k*devicePixelRatio) - cam.y]; }
@@ -571,8 +601,8 @@ function draw(){
   ctx.globalAlpha=1;
 }
 function hit(sx,sy){ const [wx,wy]=toWorld(sx,sy); let best=null; for(const v of G.nodes){ const d=Math.hypot(v.x-wx,v.y-wy); if(d<radius(v)+4 && (!best||d<best.d)) best={v,d}; } return best?.v||null; }
-cv.addEventListener('mousedown', e => { const r=cv.getBoundingClientRect(); const v=hit(e.clientX-r.left,e.clientY-r.top); if(v){ drag={v,wasFixed:v.fixed}; v.fixed=true; cv.style.cursor='grabbing'; } else panning={x:e.clientX,y:e.clientY,cx:cam.x,cy:cam.y}; });
-window.addEventListener('mousemove', e => { const r=cv.getBoundingClientRect(); if(drag){ const [wx,wy]=toWorld(e.clientX-r.left,e.clientY-r.top); drag.v.x=wx; drag.v.y=wy; kick(); } else if(panning){ cam.x=panning.cx+(e.clientX-panning.x)/cam.k; cam.y=panning.cy+(e.clientY-panning.y)/cam.k; draw(); } else if (e.target===cv) { const v=hit(e.clientX-r.left,e.clientY-r.top); if(v!==hover){hover=v; cv.style.cursor=v?'pointer':'grab'; draw();} } });
+cv.addEventListener('mousedown', e => { const r=cv.getBoundingClientRect(); const v=hit(e.clientX-r.left,e.clientY-r.top); if(v){ drag={v,wasFixed:v.fixed,tx:v.x,ty:v.y}; v.fixed=true; cv.style.cursor='grabbing'; /* capture so a fast drag that leaves the canvas keeps holding the node instead of dropping it mid gesture */ try{ cv.setPointerCapture(e.pointerId); }catch{} } else panning={x:e.clientX,y:e.clientY,cx:cam.x,cy:cam.y}; });
+window.addEventListener('mousemove', e => { const r=cv.getBoundingClientRect(); if(drag){ const [wx,wy]=toWorld(e.clientX-r.left,e.clientY-r.top); drag.tx=wx; drag.ty=wy; kick(); } else if(panning){ cam.x=panning.cx+(e.clientX-panning.x)/cam.k; cam.y=panning.cy+(e.clientY-panning.y)/cam.k; draw(); } else if (e.target===cv) { const v=hit(e.clientX-r.left,e.clientY-r.top); if(v!==hover){hover=v; cv.style.cursor=v?'pointer':'grab'; draw();} } });
 window.addEventListener('mouseup', () => { if(drag){ drag.v.fixed=drag.wasFixed; drag=null; kick(); } panning=null; cv.style.cursor='grab'; });
 cv.addEventListener('click', e => { const r=cv.getBoundingClientRect(); const v=hit(e.clientX-r.left,e.clientY-r.top); selected=v; inspect(v); draw(); if (v) showNodeView(v); });
 async function showNodeView(v){
