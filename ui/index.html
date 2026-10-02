@@ -328,6 +328,10 @@ async function refresh(){
   if (!state.configured) { $('#viewBody').innerHTML = '<b>Model not set up.</b> Open <a href="#" id="openSetup">Settings → Models</a>, paste your OpenRouter key, keep Space Bunny Alpha, Save. Then ask again.'; openPanel('#viewp'); const l=$('#openSetup'); if(l) l.onclick=e=>{e.preventDefault(); $('#gearBtn').click(); document.querySelector('.tabs button[data-t=models]').click();}; }
   $('#tele').innerHTML = `<span class="pill">run <b>${esc(state.run)}</b></span><span class="pill"><b>${state.notes.toLocaleString()}</b> notes</span><span class="pill"><b>${state.resolved.toLocaleString()}</b> resolved</span><span class="pill"><b>${state.cardsPer100}</b> cards / 100</span><span class="pill">${esc((state.llm||'').split('/').pop())}</span>`;
   $('#cDeck').textContent = state.deckSize; $('#cGhost').textContent = state.ghosts; $('#cRules').textContent = state.rules.length;
+  // Set here rather than in loadHealth, so the badge is right from the first paint. It was only
+  // filled in when the Health tab was opened, so the rail said 0 for a screen that always had
+  // hundreds of cards behind it. This is the unsure count, which is what the screen is about.
+  $('#cHealth').textContent = state.unsure ?? 0;
   $('#cDup').textContent = Object.values(state.dupCounts).reduce((a,b)=>a+b,0);
   renderDeck(); renderRules();
 }
@@ -464,7 +468,7 @@ function renderHealth(){
   $('#healthPatterns').innerHTML = h.deck.byPattern.length ? h.deck.byPattern.map(x => `<div class="row" style="grid-template-columns:1fr 120px 50px"><span class="mono" style="font-size:11.5px">${esc(x.pattern)}</span>${bar(x.n, Math.max(...h.deck.byPattern.map(y=>y.n),1))}<span class="c">${x.n}</span></div>`).join('') : '<div class="empty">No open questions. The deck is clear.</div>';
 }
 
-async function loadHealth(){ try { health = await api('/api/health'); const c = $('#cHealth'); if (c && health) c.textContent = health.deck.pending; renderHealth(); } catch (e) { health = null; } }
+async function loadHealth(){ try { health = await api('/api/health'); renderHealth(); } catch (e) { health = null; } }
 
 function renderRules(){ const R=$('#ruleRows'); R.innerHTML = state.rules.length ? state.rules.map(r=>`<div class="row" style="grid-template-columns:1fr">${ruleRow(r)}</div>`).join('') : '<div class="empty">No rules yet.</div>'; bindRuleRows(R); const L=$('#layaBox'); if (L && state.laya) L.innerHTML = `<b style="color:var(--text)">Laya is trained on this store.</b> ${state.laya.examples} training examples, the standing and forming rules, and your <i>Laya Best Practices</i> note are rewritten into <span class="mono">runs/laya</span> after every answer. Refresh the local model (base ${esc(state.laya.base)}) with <code>ollama create celsus-laya -f "${esc(state.laya.modelfile)}"</code> then point Settings, Models, Local model at <span class="mono">celsus-laya</span>.`; }
 

@@ -265,7 +265,12 @@ const server = http.createServer(async (req, res) => {
       const sort = (url.searchParams.get('sort') === 'impact') ? 'impact' : 'unsure';
       const { deck, decided, total } = buildCards(sort); const human = labels.filter(l => l.source === 'human');
       const topRules = Object.entries(rules).map(([pattern, r]: any) => ({ pattern, ...r })).sort((a, b) => b.support - a.support).slice(0, 12);
-      return send(res, 200, { llm: loadConfig()?.llm, llmBaseUrl: loadConfig()?.llmBaseUrl || '', configured: !!loadConfig()?.openrouterKey, run: path.basename(latestRunWith('resolutions.json') || ''), notes: notes.length, resolved: Object.keys(resolutions).length, ghosts: ghosts.length, sort, deck: deck.slice(0, 60), deckSize: deck.length, totalCards: total, decidedForYou: labels.filter(l => l.source === 'rule').slice(-10).reverse(), answered: human.length, rules: topRules, unsure: deck.slice(0, 60).filter((c: any) => (c.p ?? 1) < 0.7).length, cardsPer100: (decisions.length + links.length + owners.length + dups.length) ? +((deck.length / (decisions.length + links.length + owners.length + dups.length)) * 100).toFixed(1) : 0, dupCounts: dups.reduce((m: any, r: any) => { m[r.verdict] = (m[r.verdict] || 0) + 1; return m; }, {}), laya: layaInfo() });
+      // Counted over the whole deck, not over the 60 cards sent to the client. This used to be
+      // deck.slice(0,60), so it answered "how many of the first sixty are unsure" while every screen
+      // read it as "how many are unsure": 60 shown against a real 147. The deck is already built here,
+      // so the honest number costs nothing.
+      const unsureCount = deck.filter((c: any) => (c.p ?? 1) < 0.7).length;
+      return send(res, 200, { llm: loadConfig()?.llm, llmBaseUrl: loadConfig()?.llmBaseUrl || '', configured: !!loadConfig()?.openrouterKey, run: path.basename(latestRunWith('resolutions.json') || ''), notes: notes.length, resolved: Object.keys(resolutions).length, ghosts: ghosts.length, sort, deck: deck.slice(0, 60), deckSize: deck.length, totalCards: total, decidedForYou: labels.filter(l => l.source === 'rule').slice(-10).reverse(), answered: human.length, rules: topRules, unsure: unsureCount, cardsPer100: (decisions.length + links.length + owners.length + dups.length) ? +((deck.length / (decisions.length + links.length + owners.length + dups.length)) * 100).toFixed(1) : 0, dupCounts: dups.reduce((m: any, r: any) => { m[r.verdict] = (m[r.verdict] || 0) + 1; return m; }, {}), laya: layaInfo() });
     }
     if (p === '/api/answer' && req.method === 'POST') {
       const b = await readBody(req);
